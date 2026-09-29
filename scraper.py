@@ -8,12 +8,25 @@ from bs4 import BeautifulSoup
 
 URL = "https://www.icaionlineregistration.org/launchbatchdetail.aspx"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = "@OCreminder"
 DATA_FILE = "seen_batches.json"
 
-# Western Region = 2, Orientation Course = 46
-REGION_ID = "2"
-COURSE_ID = "46"
+# --- CHANNELS CONFIGURATION ---
+CHANNEL_INTER = "@OCreminder"            # IT & OC
+CHANNEL_FINAL = "@GMCSreminder"       # Replace with your 2nd channel handle (Adv ITT & GMCS)
+
+# --- COURSES CONFIGURATION ---
+COURSES_TO_CHECK = [
+    # ICITSS (Inter) -> Channel 1
+    {"id": "46", "name": "Orientation Course (OC)", "channel": CHANNEL_INTER, "icon": "🎓"},
+    {"id": "47", "name": "Information Technology (ITT)", "channel": CHANNEL_INTER, "icon": "💻"},
+    
+    # AICITSS (Final) -> Channel 2
+    {"id": "48", "name": "Advanced ITT", "channel": CHANNEL_FINAL, "icon": "⚡"},
+    {"id": "45", "name": "MCS Course (GMCS)", "channel": CHANNEL_FINAL, "icon": "👔"},
+    {"id": "49", "name": "MCS Course (Weekend)", "channel": CHANNEL_FINAL, "icon": "👔"}
+]
+
+REGION_ID = "2"  # Western Region
 
 BRANCHES_TO_CHECK = {
     "JALGAON": "68",
@@ -50,13 +63,13 @@ def save_seen_batches(seen_batches):
     with open(DATA_FILE, "w") as f:
         json.dump(sorted(list(seen_batches)), f, indent=2)
 
-def send_telegram_alert(batch):
+def send_telegram_alert(batch, course):
     if not BOT_TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN is not set.")
         return False
 
     text = (
-        f"🎓 <b>New ICAI OC Batch Announced!</b>\n\n"
+        f"{course['icon']} <b>New ICAI {course['name']} Batch Announced!</b>\n\n"
         f"📍 <b>Centre:</b> {batch['pou']}\n"
         f"🆔 <b>Batch Code:</b> <code>{batch['batch_no']}</code>\n"
         f"📅 <b>Dates:</b> {batch['from_date']} to {batch['to_date']}\n"
@@ -68,7 +81,7 @@ def send_telegram_alert(batch):
 
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": CHANNEL_ID,
+        "chat_id": course["channel"],
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True
@@ -77,8 +90,8 @@ def send_telegram_alert(batch):
     try:
         res = requests.post(api_url, json=payload, timeout=10)
         res.raise_for_status()
-        print(f"Sent alert for batch: {batch['batch_no']}")
-        time.sleep(1.5)  # Telegram anti-rate-limit spacing
+        print(f"[{course['name']}] Sent alert for: {batch['batch_no']} -> {course['channel']}")
+        time.sleep(1.5)  # Telegram anti-rate-limit delay
         return True
     except Exception as e:
         print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
@@ -110,7 +123,7 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def query_branch(session, branch_code, viewstate, eventval, viewstategen):
+def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen):
     payload = {
         "__EVENTTARGET": "",
         "__EVENTARGUMENT": "",
@@ -122,7 +135,7 @@ def query_branch(session, branch_code, viewstate, eventval, viewstategen):
         "__EVENTVALIDATION": eventval,
         "ddl_reg": REGION_ID,
         "ddlPou": branch_code,
-        "ddl_course": COURSE_ID,
+        "ddl_course": course_id,
         "btn_getlist": "Get List"
     }
     return session.post(URL, data=payload, headers=HEADERS, timeout=20)
@@ -132,7 +145,7 @@ def main():
     newly_seen = set()
     session = requests.Session()
 
-    print("Fetching initial page...")
+    print("Fetching fresh session tokens from portal...")
     res = session.get(URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(res.text, "html.parser")
 
@@ -144,39 +157,39 @@ def main():
     live_ev = ev.get("value", "") if ev else ""
     live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
 
-    for branch_name, branch_code in BRANCHES_TO_CHECK.items():
-        print(f"Checking {branch_name}...")
-        try:
-            post_res = query_branch(session, branch_code, live_vs, live_ev, live_gen)
-            table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
-
-            if not table:
-                post_res = query_branch(
-                    session, branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
-                )
+    for course in COURSES_TO_CHECK:
+        print(f"\n================ Scanning: {course['name']} ================")
+        for branch_name, branch_code in BRANCHES_TO_CHECK.items():
+            try:
+                # Primary attempt
+                post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
                 table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-            if not table:
-                print(f"[{branch_name}] No batches listed.")
-                continue
+                # Fallback attempt if dynamic validation expires
+                if not table:
+                    post_res = query_portal(
+                        session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
+                    )
+                    table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-            batches = parse_batches(table)
-            print(f"[{branch_name}] Found {len(batches)} batches.")
+                if not table:
+                    continue
 
-            for b in batches:
-                if b["batch_no"] not in seen_batches:
-                    if send_telegram_alert(b):
-                        seen_batches.add(b["batch_no"])
-                        newly_seen.add(b["batch_no"])
+                batches = parse_batches(table)
+                for b in batches:
+                    if b["batch_no"] not in seen_batches:
+                        if send_telegram_alert(b, course):
+                            seen_batches.add(b["batch_no"])
+                            newly_seen.add(b["batch_no"])
 
-        except Exception as e:
-            print(f"Error querying {branch_name}: {e}")
+            except Exception as e:
+                print(f"Error querying {course['name']} @ {branch_name}: {e}")
 
     if newly_seen:
         save_seen_batches(seen_batches)
-        print(f"Successfully processed and recorded {len(newly_seen)} new batches.")
+        print(f"\nRun complete: recorded {len(newly_seen)} new batches.")
     else:
-        print("Scan finished. No new batches detected.")
+        print("\nRun complete: no new batches detected across any courses.")
 
 if __name__ == "__main__":
     main()
