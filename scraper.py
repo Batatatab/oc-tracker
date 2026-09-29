@@ -1,4 +1,6 @@
 import os
+import re
+import time
 import json
 import urllib.parse
 import requests
@@ -52,7 +54,7 @@ def save_seen_batches(seen_batches):
 def send_telegram_alert(batch):
     if not BOT_TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN is not set.")
-        return
+        return False
 
     text = (
         f"🎓 <b>New ICAI OC Batch Announced!</b>\n\n"
@@ -72,13 +74,16 @@ def send_telegram_alert(batch):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-    
+
     try:
         res = requests.post(api_url, json=payload, timeout=10)
         res.raise_for_status()
         print(f"Sent alert for batch: {batch['batch_no']}")
+        time.sleep(1.5)  # Pause to respect Telegram's 1 msg/sec channel limit
+        return True
     except Exception as e:
         print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
+        return False
 
 def find_batch_table(soup):
     for table in soup.find_all("table"):
@@ -161,11 +166,11 @@ def main():
             batches = parse_batches(table)
             print(f"[{branch_name}] Found {len(batches)} batches.")
 
-            for b in batches:
+           for b in batches:
                 if b["batch_no"] not in seen_batches:
-                    send_telegram_alert(b)
-                    seen_batches.add(b["batch_no"])
-                    newly_seen.add(b["batch_no"])
+                    if send_telegram_alert(b):
+                        seen_batches.add(b["batch_no"])
+                        newly_seen.add(b["batch_no"])
 
         except Exception as e:
             print(f"Error querying {branch_name}: {e}")
