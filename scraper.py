@@ -1,6 +1,6 @@
 import os
-import re
 import json
+import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 
@@ -21,28 +21,20 @@ BRANCHES_TO_CHECK = {
     "AHMEDABAD": "56"
 }
 
+# Verified state tokens captured from working browser session
+FALLBACK_VIEWSTATE = urllib.parse.unquote(
+    "%2FwEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgZkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUmCUFITUVEQUJBRApBSE1FRE5BR0FSBUFLT0xBCEFNUkFWQVRJBUFOQU5ECkFVUkFOR0FCQUQHQkhBUlVDSAlCSEFWTkFHQVIEQkhVSgVESFVMRQpHQU5ESElESEFNDEdBTkRISU5BR0FSIANHT0EMSWNoYWxrYXJhbmppB0pBTEdBT04ISkFNTkFHQVIOS2FseWFuRG9tYml2bGkIS09MSEFQVVIFTEFUVVIGTVVNQkFJBk5BR1BVUgZOQU5ERUQGTkFTSElLC05BVkkgTVVNQkFJB05BVlNBUkkQUElNUFJJIENISU5DSFdBRARQVU5FBlJBSktPVApSYXRhbmFnaXJpBlNBTkdMSQZTQVRBUkEHU09MQVBVUgVTVVJBVAVUSEFORQh0cnlzdXBlcghWYWRvZGFyYQRWQVBJBVZBU0FJFSYCNTYCNTcCNTgCNjACNTkCNjECNjMCNjQDMjY2AjY1AjY2AzI4MgI2NwMyNzQCNjgCNjkDMjY1AjcwAjcxAzI1NQI3MgI3MwI3NAI3NgI3NQI3OAI3NwI3OQMyNjkCODACODECODICODMCODQDMjYxAjYyAjg2Ajg1FCsDJmdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZGQCDw8QDxYGHwEFC2NvdXJzZV9uYW1lHwIFCWNvdXJzZV9pZB8DZ2QQFQUcQWR2YW5jZWQgKElDSVRTUykgTUNTIENvdXJzZSZBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlIC0gV2Vla2VuZClBSUNJVFNTIC0gQWR2YW5jZWQgSW5mb3JtYXRpb24gVGVjaG5vbG9neR9JQ0lUU1MgLSBJbmZvcm1hdGlvbiBUZWNobm9sb2d5G0lDSVRTUyAtIE9yaWVudGF0aW9uIENvdXJzZRUFAjQ1AjQ5AjQ4AjQ3AjQ2FCsDBWdnZ2dnZGQCEw9kFgJmD2QWAgIBDzwrABEDAA8WBB8DZx4LXyFJdGVtQ291bnQCAWQBEBYAFgAWAAwUKwAAFgJmD2QWBgIBD2QWFmYPZBYCAgEPDxYCHgRUZXh0BRRJQ0lUU1NPQ19fSkFMR0FPTl8xMWRkAgEPZBYCAgEPDxYCHwUFAjQ4ZGQCAg9kFgICAQ8PFgIfBQUKMTgvMTAvMjAyNmRkAgMPZBYCAgEPDxYCHwUFCjAxLzExLzIwMjZkZAIED2QWAgIBDw8WAh8FBRE4LTAtQU0gdG8gMi0zMC1QTWRkAgUPZBYCAgEPDxYCHwUFB0pBTEdBT05kZAIGD2QWAgIBDw8WAh8FBRtJQ0lUU1MgLSBPcmllbnRhdGlvbiBDb3Vyc2VkZAIHD2QWAgIBDw8WAh8FBQdHZW5lcmFsZGQCCA9kFgQCAQ8PFgIfBQUCNDZkZAIDDw8WAh8FBQEyZGQCCQ9kFgICAQ8PFgIfBQUKMTcvMDgvMjAyNmRkAgoPZBYCAgEPDxYCHwUFElJlZ2lzdHJhdGlvbiBTdGFydGRkAgIPDxYCHwBoZGQCAw8PFgIfAGhkZBgBBQlHcmlkVmlldzEPPCsADAEIAgFkQrpm6LsM2NU1AMgmZ%2FVjPpvuhjK%2BXW8KFr8vqx5L6Ho%3D"
+)
+FALLBACK_EVENTVALIDATION = urllib.parse.unquote(
+    "%2FwEdADWt6592kFtp90VL2l8q6a0CBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F%2FRmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3kj2dHwvW82cujaYSiCkZ3sA9ZB91Hi9Hb4eSQCzCsWTr0zL%2F%2FrRmHUvq882TgElaDiAF1C15DShQJg3gLf3lIBSHkjRrhTv1gK%2FpfTt%2Bj0UqvFGMDYBctWFaudAlGyyom2tpbxbuqFVQa0ii1p%2F06xhhpNFv%2FptNOUicIA960rmZMS1R2hQsQTENvLg2JoqpJwo%2Bu1QKo3GadUL4kU7BPMW4r41v%2Fas%2Fjqz%2Bc3gK5Dg6Gix9t5pEuSWM8VlLuDA%2BhQ8ouPJD4lh19ggQRT9m%2ByKyrqt68fILF55VOdOBNniNPS2AFNQYQbtWz49tYHuHkirPaKyBDZHHpb6hilqKfE71zVWg6UO85R3Cu5VKOjdHxCdMzKi5w%2FNHcC0UDhMm2AfezN8hGv%2FdwZzolfDNabPd7NHiDshxfHCCF7RYhdBp5qDKfl7Q8B3xsnZA%2BpTX7BLmYS52zorp7Mo5%2BfYtnZMUNFTMQYWQvKImsPBvs2BsiVWYgA1%2FcGwVXOUX83EzIEhjUUHkyf8Ko4hSy1M6oBD4Dq%2Fxl5DN3fqI27no%2BEPb22d%2Bz3sdQbEZAx7Cd6pagjLwEz%2FjL2jk%2BPB2NU9qvd0a7Bu4U6sDaZwEe8HbKgtReP0w3R41UEL7KPhZFFYL4U%2FTCSCSOOEFh7xgwlhyvdWKLNhBIVeGRqWdDTr3wOGDxGIlb1UPRXn%2Fcp%2FX%2Fx1er9UblSXGkW8TsL7rmcYxIHVa6HOiXsJdx4k5V59u54LAjhLOcFrOCbR%2B0TLZ1yPzxhNBp58LV3C%2BSDQPNS5yIY6NCIsbOSWoJPjFmpjk9u%2B43%2FGIgdV4zOqQzLgbAk5LHRxRsrRN8LG0Syh5ICDtd5YdzudyqtGD4WIukGRxsM7zCt4OK0obpTHn3AdcEKmFh891O2LB9kbThRvuk76pdSnZ1Vn4DHFo0gVOLv3RSi7Y7vExhtpSYs0p0QACwwJIP2EmMQNHVKMKQvTgrCvl65"
+)
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Origin": "https://www.icaionlineregistration.org",
     "Referer": "https://www.icaionlineregistration.org/launchbatchdetail.aspx",
 }
-
-def extract_form_fields(soup):
-    """Extracts all current hidden inputs and default select values from the page."""
-    data = {}
-    for inp in soup.find_all("input"):
-        name = inp.get("name")
-        if name:
-            data[name] = inp.get("value", "")
-            
-    for sel in soup.find_all("select"):
-        name = sel.get("name")
-        if name:
-            selected_opt = sel.find("option", selected=True) or sel.find("option")
-            data[name] = selected_opt.get("value", "") if selected_opt else ""
-            
-    return data
 
 def load_seen_batches():
     if os.path.exists(DATA_FILE):
@@ -88,93 +80,92 @@ def send_telegram_alert(batch):
     except Exception as e:
         print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
 
+def find_batch_table(soup):
+    for table in soup.find_all("table"):
+        text = table.text
+        if "Batch No" in text and "Available Seats" in text:
+            return table
+    return None
+
+def parse_batches(table):
+    results = []
+    rows = table.find_all("tr")
+    for row in rows:
+        cols = [c.text.strip() for c in row.find_all("td")]
+        if len(cols) >= 6 and "Batch No" not in cols[0]:
+            batch_data = {
+                "batch_no": cols[0],
+                "seats": cols[1],
+                "from_date": cols[2],
+                "to_date": cols[3],
+                "timings": cols[4],
+                "pou": cols[5],
+                "status": cols[10] if len(cols) > 10 else "Open"
+            }
+            if batch_data["batch_no"]:
+                results.append(batch_data)
+    return results
+
+def query_branch(session, branch_code, viewstate, eventval, viewstategen):
+    payload = {
+        "__EVENTTARGET": "",
+        "__EVENTARGUMENT": "",
+        "__LASTFOCUS": "",
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstategen,
+        "__SCROLLPOSITIONX": "0",
+        "__SCROLLPOSITIONY": "0",
+        "__EVENTVALIDATION": eventval,
+        "ddl_reg": REGION_ID,
+        "ddlPou": branch_code,
+        "ddl_course": COURSE_ID,
+        "btn_getlist": "Get List"
+    }
+    return session.post(URL, data=payload, headers=HEADERS, timeout=20)
+
 def main():
     seen_batches = load_seen_batches()
     newly_seen = set()
     session = requests.Session()
 
-    print("Step 1: Loading initial page...")
+    print("Fetching initial page...")
     res = session.get(URL, headers=HEADERS, timeout=20)
-    if res.status_code != 200:
-        print(f"Failed to load page. HTTP Status: {res.status_code}")
-        return
-
     soup = BeautifulSoup(res.text, "html.parser")
-    form_data = extract_form_fields(soup)
 
-    if "__VIEWSTATE" not in form_data:
-        print("Failed to find __VIEWSTATE on initial load.")
-        return
+    vs = soup.find("input", {"id": "__VIEWSTATE"})
+    ev = soup.find("input", {"id": "__EVENTVALIDATION"})
+    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
 
-    print("Step 2: Selecting Western Region...")
-    form_data["__EVENTTARGET"] = "ddl_reg"
-    form_data["__EVENTARGUMENT"] = ""
-    form_data["ddl_reg"] = REGION_ID
-    # Remove submit button when triggering a dropdown change postback
-    form_data.pop("btn_getlist", None)
-
-    res_reg = session.post(URL, data=form_data, headers=HEADERS, timeout=20)
-    if res_reg.status_code != 200:
-        print(f"Region postback failed. HTTP Status: {res_reg.status_code}")
-        return
-
-    soup_reg = BeautifulSoup(res_reg.text, "html.parser")
-    reg_form = extract_form_fields(soup_reg)
-
-    if "__VIEWSTATE" not in reg_form:
-        print("Failed to capture updated VIEWSTATE after selecting region.")
-        return
-
-    print("Step 3: Western Region state ready. Querying branches...")
-    reg_form["__EVENTTARGET"] = ""
-    reg_form["__EVENTARGUMENT"] = ""
-    reg_form["ddl_reg"] = REGION_ID
-    reg_form["ddl_course"] = COURSE_ID
-    reg_form["btn_getlist"] = "Get List"
+    live_vs = vs.get("value", "") if vs else ""
+    live_ev = ev.get("value", "") if ev else ""
+    live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
 
     for branch_name, branch_code in BRANCHES_TO_CHECK.items():
-        payload = reg_form.copy()
-        payload["ddlPou"] = branch_code
-
+        print(f"Checking {branch_name}...")
         try:
-            post_res = session.post(URL, data=payload, headers=HEADERS, timeout=20)
-            branch_soup = BeautifulSoup(post_res.text, "html.parser")
-            
-            # Match GridView table or any table containing "Batch No"
-            table = branch_soup.find("table", id=re.compile(r"gridview", re.I))
+            # Attempt 1: Query using harvested session tokens
+            post_res = query_branch(session, branch_code, live_vs, live_ev, live_gen)
+            table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
+
+            # Attempt 2: Fallback to verified tokens if dynamic validation rejected the query
             if not table:
-                for t in branch_soup.find_all("table"):
-                    if "Batch No" in t.text:
-                        table = t
-                        break
+                post_res = query_branch(
+                    session, branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
+                )
+                table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
             if not table:
                 print(f"[{branch_name}] No batches listed.")
                 continue
 
-            rows = table.find_all("tr")[1:]  # skip table headers
-            print(f"[{branch_name}] Found {len(rows)} batches.")
+            batches = parse_batches(table)
+            print(f"[{branch_name}] Found {len(batches)} batches.")
 
-            for row in rows:
-                cols = [c.text.strip() for c in row.find_all("td")]
-                if len(cols) < 7:
-                    continue
-
-                batch_no = cols[0]
-                batch_data = {
-                    "batch_no": batch_no,
-                    "seats": cols[1],
-                    "from_date": cols[2],
-                    "to_date": cols[3],
-                    "timings": cols[4],
-                    "pou": cols[5],
-                    "status": cols[10] if len(cols) > 10 else "Open"
-                }
-
-                if batch_no not in seen_batches:
-                    send_telegram_alert(batch_data)
-                    seen_batches.add(batch_no)
-                    newly_seen.add(batch_no)
+            for b in batches:
+                if b["batch_no"] not in seen_batches:
+                    send_telegram_alert(b)
+                    seen_batches.add(b["batch_no"])
+                    newly_seen.add(b["batch_no"])
 
         except Exception as e:
             print(f"Error querying {branch_name}: {e}")
