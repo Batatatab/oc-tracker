@@ -23,7 +23,6 @@ BRANCHES_TO_CHECK = {
     "AHMEDABAD": "56"
 }
 
-# Verified state tokens captured from working browser session
 FALLBACK_VIEWSTATE = urllib.parse.unquote(
     "%2FwEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgZkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUmCUFITUVEQUJBRApBSE1FRE5BR0FSBUFLT0xBCEFNUkFWQVRJBUFOQU5ECkFVUkFOR0FCQUQHQkhBUlVDSAlCSEFWTkFHQVIEQkhVSgVESFVMRQpHQU5ESElESEFNDEdBTkRISU5BR0FSIANHT0EMSWNoYWxrYXJhbmppB0pBTEdBT04ISkFNTkFHQVIOS2FseWFuRG9tYml2bGkIS09MSEFQVVIFTEFUVVIGTVVNQkFJBk5BR1BVUgZOQU5ERUQGTkFTSElLC05BVkkgTVVNQkFJB05BVlNBUkkQUElNUFJJIENISU5DSFdBRARQVU5FBlJBSktPVApSYXRhbmFnaXJpBlNBTkdMSQZTQVRBUkEHU09MQVBVUgVTVVJBVAVUSEFORQh0cnlzdXBlcghWYWRvZGFyYQRWQVBJBVZBU0FJFSYCNTYCNTcCNTgCNjACNTkCNjECNjMCNjQDMjY2AjY1AjY2AzI4MgI2NwMyNzQCNjgCNjkDMjY1AjcwAjcxAzI1NQI3MgI3MwI3NAI3NgI3NQI3OAI3NwI3OQMyNjkCODACODECODICODMCODQDMjYxAjYyAjg2Ajg1FCsDJmdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZGQCDw8QDxYGHwEFC2NvdXJzZV9uYW1lHwIFCWNvdXJzZV9pZB8DZ2QQFQUcQWR2YW5jZWQgKElDSVRTUykgTUNTIENvdXJzZSZBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlIC0gV2Vla2VuZClBSUNJVFNTIC0gQWR2YW5jZWQgSW5mb3JtYXRpb24gVGVjaG5vbG9neR9JQ0lUU1MgLSBJbmZvcm1hdGlvbiBUZWNobm9sb2d5G0lDSVRTUyAtIE9yaWVudGF0aW9uIENvdXJzZRUFAjQ1AjQ5AjQ4AjQ3AjQ2FCsDBWdnZ2dnZGQCEw9kFgJmD2QWAgIBDzwrABEDAA8WBB8DZx4LXyFJdGVtQ291bnQCAWQBEBYAFgAWAAwUKwAAFgJmD2QWBgIBD2QWFmYPZBYCAgEPDxYCHgRUZXh0BRRJQ0lUU1NPQ19fSkFMR0FPTl8xMWRkAgEPZBYCAgEPDxYCHwUFAjQ4ZGQCAg9kFgICAQ8PFgIfBQUKMTgvMTAvMjAyNmRkAgMPZBYCAgEPDxYCHwUFCjAxLzExLzIwMjZkZAIED2QWAgIBDw8WAh8FBRE4LTAtQU0gdG8gMi0zMC1QTWRkAgUPZBYCAgEPDxYCHwUFB0pBTEdBT05kZAIGD2QWAgIBDw8WAh8FBRtJQ0lUU1MgLSBPcmllbnRhdGlvbiBDb3Vyc2VkZAIHD2QWAgIBDw8WAh8FBQdHZW5lcmFsZGQCCA9kFgQCAQ8PFgIfBQUCNDZkZAIDDw8WAh8FBQEyZGQCCQ9kFgICAQ8PFgIfBQUKMTcvMDgvMjAyNmRkAgoPZBYCAgEPDxYCHwUFElJlZ2lzdHJhdGlvbiBTdGFydGRkAgIPDxYCHwBoZGQCAw8PFgIfAGhkZBgBBQlHcmlkVmlldzEPPCsADAEIAgFkQrpm6LsM2NU1AMgmZ%2FVjPpvuhjK%2BXW8KFr8vqx5L6Ho%3D"
 )
@@ -74,12 +73,12 @@ def send_telegram_alert(batch):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-
+    
     try:
         res = requests.post(api_url, json=payload, timeout=10)
         res.raise_for_status()
         print(f"Sent alert for batch: {batch['batch_no']}")
-        time.sleep(1.5)  # Pause to respect Telegram's 1 msg/sec channel limit
+        time.sleep(1.5)  # Telegram anti-rate-limit spacing
         return True
     except Exception as e:
         print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
@@ -148,11 +147,9 @@ def main():
     for branch_name, branch_code in BRANCHES_TO_CHECK.items():
         print(f"Checking {branch_name}...")
         try:
-            # Attempt 1: Query using harvested session tokens
             post_res = query_branch(session, branch_code, live_vs, live_ev, live_gen)
             table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-            # Attempt 2: Fallback to verified tokens if dynamic validation rejected the query
             if not table:
                 post_res = query_branch(
                     session, branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
@@ -166,7 +163,7 @@ def main():
             batches = parse_batches(table)
             print(f"[{branch_name}] Found {len(batches)} batches.")
 
-           for b in batches:
+            for b in batches:
                 if b["batch_no"] not in seen_batches:
                     if send_telegram_alert(b):
                         seen_batches.add(b["batch_no"])
