@@ -13,7 +13,6 @@ DATA_FILE = "seen_batches.json"
 REGION_ID = "2"
 COURSE_ID = "46"
 
-# Branches to monitor
 BRANCHES_TO_CHECK = {
     "JALGAON": "68",
     "PUNE": "77",
@@ -23,22 +22,27 @@ BRANCHES_TO_CHECK = {
 }
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Origin": "https://www.icaionlineregistration.org",
     "Referer": "https://www.icaionlineregistration.org/launchbatchdetail.aspx",
 }
 
-def extract_asp_tokens(soup):
-    vs = soup.find("input", {"id": "__VIEWSTATE"})
-    ev = soup.find("input", {"id": "__EVENTVALIDATION"})
-    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
-    
-    return {
-        "__VIEWSTATE": vs.get("value", "") if vs else "",
-        "__EVENTVALIDATION": ev.get("value", "") if ev else "",
-        "__VIEWSTATEGENERATOR": gen.get("value", "10EF2921") if gen else "10EF2921"
-    }
+def extract_form_fields(soup):
+    """Extracts all current hidden inputs and default select values from the page."""
+    data = {}
+    for inp in soup.find_all("input"):
+        name = inp.get("name")
+        if name:
+            data[name] = inp.get("value", "")
+            
+    for sel in soup.find_all("select"):
+        name = sel.get("name")
+        if name:
+            selected_opt = sel.find("option", selected=True) or sel.find("option")
+            data[name] = selected_opt.get("value", "") if selected_opt else ""
+            
+    return data
 
 def load_seen_batches():
     if os.path.exists(DATA_FILE):
@@ -58,7 +62,6 @@ def send_telegram_alert(batch):
         print("Error: TELEGRAM_BOT_TOKEN is not set.")
         return
 
-    # Use HTML formatting to prevent underscore parse errors
     text = (
         f"🎓 <b>New ICAI OC Batch Announced!</b>\n\n"
         f"📍 <b>Centre:</b> {batch['pou']}\n"
@@ -90,57 +93,66 @@ def main():
     newly_seen = set()
     session = requests.Session()
 
-    print("Fetching initial page...")
+    print("Step 1: Loading initial page...")
     res = session.get(URL, headers=HEADERS, timeout=20)
-    tokens = extract_asp_tokens(BeautifulSoup(res.text, "html.parser"))
-
-    # Step 1: Simulate selecting Western Region to populate branches and authorize branch IDs
-    print(f"Selecting Region {REGION_ID} (Western)...")
-    region_payload = {
-        "__EVENTTARGET": "ddl_reg",
-        "__EVENTARGUMENT": "",
-        "__LASTFOCUS": "",
-        "__VIEWSTATE": tokens["__VIEWSTATE"],
-        "__VIEWSTATEGENERATOR": tokens["__VIEWSTATEGENERATOR"],
-        "__EVENTVALIDATION": tokens["__EVENTVALIDATION"],
-        "ddl_reg": REGION_ID,
-        "ddlPou": "Select",
-        "ddl_course": COURSE_ID,
-    }
-    res_reg = session.post(URL, data=region_payload, headers=HEADERS, timeout=20)
-    reg_tokens = extract_asp_tokens(BeautifulSoup(res_reg.text, "html.parser"))
-
-    if not reg_tokens["__VIEWSTATE"]:
-        print("Failed to initialize Western Region state.")
+    if res.status_code != 200:
+        print(f"Failed to load page. HTTP Status: {res.status_code}")
         return
 
-    # Step 2: Query each branch using the populated state
+    soup = BeautifulSoup(res.text, "html.parser")
+    form_data = extract_form_fields(soup)
+
+    if "__VIEWSTATE" not in form_data:
+        print("Failed to find __VIEWSTATE on initial load.")
+        return
+
+    print("Step 2: Selecting Western Region...")
+    form_data["__EVENTTARGET"] = "ddl_reg"
+    form_data["__EVENTARGUMENT"] = ""
+    form_data["ddl_reg"] = REGION_ID
+    # Remove submit button when triggering a dropdown change postback
+    form_data.pop("btn_getlist", None)
+
+    res_reg = session.post(URL, data=form_data, headers=HEADERS, timeout=20)
+    if res_reg.status_code != 200:
+        print(f"Region postback failed. HTTP Status: {res_reg.status_code}")
+        return
+
+    soup_reg = BeautifulSoup(res_reg.text, "html.parser")
+    reg_form = extract_form_fields(soup_reg)
+
+    if "__VIEWSTATE" not in reg_form:
+        print("Failed to capture updated VIEWSTATE after selecting region.")
+        return
+
+    print("Step 3: Western Region state ready. Querying branches...")
+    reg_form["__EVENTTARGET"] = ""
+    reg_form["__EVENTARGUMENT"] = ""
+    reg_form["ddl_reg"] = REGION_ID
+    reg_form["ddl_course"] = COURSE_ID
+    reg_form["btn_getlist"] = "Get List"
+
     for branch_name, branch_code in BRANCHES_TO_CHECK.items():
-        payload = {
-            "__EVENTTARGET": "",
-            "__EVENTARGUMENT": "",
-            "__LASTFOCUS": "",
-            "__VIEWSTATE": reg_tokens["__VIEWSTATE"],
-            "__VIEWSTATEGENERATOR": reg_tokens["__VIEWSTATEGENERATOR"],
-            "__EVENTVALIDATION": reg_tokens["__EVENTVALIDATION"],
-            "ddl_reg": REGION_ID,
-            "ddlPou": branch_code,
-            "ddl_course": COURSE_ID,
-            "btn_getlist": "Get List"
-        }
+        payload = reg_form.copy()
+        payload["ddlPou"] = branch_code
 
         try:
             post_res = session.post(URL, data=payload, headers=HEADERS, timeout=20)
-            soup = BeautifulSoup(post_res.text, "html.parser")
+            branch_soup = BeautifulSoup(post_res.text, "html.parser")
             
-            # Find the GridView table (case-insensitive)
-            table = soup.find("table", id=re.compile(r"gridview", re.I))
+            # Match GridView table or any table containing "Batch No"
+            table = branch_soup.find("table", id=re.compile(r"gridview", re.I))
+            if not table:
+                for t in branch_soup.find_all("table"):
+                    if "Batch No" in t.text:
+                        table = t
+                        break
 
             if not table:
                 print(f"[{branch_name}] No batches listed.")
                 continue
 
-            rows = table.find_all("tr")[1:]  # skip header row
+            rows = table.find_all("tr")[1:]  # skip table headers
             print(f"[{branch_name}] Found {len(rows)} batches.")
 
             for row in rows:
@@ -169,9 +181,9 @@ def main():
 
     if newly_seen:
         save_seen_batches(seen_batches)
-        print(f"Added {len(newly_seen)} new batches to tracking.")
+        print(f"Successfully processed and recorded {len(newly_seen)} new batches.")
     else:
-        print("No new batches found across monitored branches.")
+        print("Scan finished. No new batches detected.")
 
 if __name__ == "__main__":
     main()
