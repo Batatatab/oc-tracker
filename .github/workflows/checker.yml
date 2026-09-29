@@ -39,6 +39,11 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase
           git add -A
-          git diff --staged --quiet || (git commit -m "Auto-update regional state & topic maps [skip ci]" && git push)
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-update regional state & topic maps [skip ci]"
+            git pull --rebase --autostash
+            git push
+          else
+            echo "No changes detected across any state or topic files."
+          fi
