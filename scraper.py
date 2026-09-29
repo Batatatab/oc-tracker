@@ -10,37 +10,57 @@ URL = "https://www.icaionlineregistration.org/launchbatchdetail.aspx"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 DATA_FILE = "seen_batches.json"
 
-# --- CHANNELS CONFIGURATION ---
-CHANNEL_INTER = "@OCreminder"            # IT & OC
-CHANNEL_FINAL = "@GMCSreminder"       # Replace with your 2nd channel handle (Adv ITT & GMCS)
+# --- CONFIGURE YOUR TWO NIRC CHANNELS HERE ---
+CHANNEL_INTER = "@ITOCreminder"  # Orientation Course & ITT
+CHANNEL_FINAL = "@ADVITTGMCSreminder"  # Adv ITT & GMCS (MCS)
 
 # --- COURSES CONFIGURATION ---
 COURSES_TO_CHECK = [
-    # ICITSS (Inter) -> Channel 1
+    # ICITSS (Inter) -> CHANNEL_INTER
     {"id": "46", "name": "Orientation Course (OC)", "channel": CHANNEL_INTER, "icon": "🎓"},
     {"id": "47", "name": "Information Technology (ITT)", "channel": CHANNEL_INTER, "icon": "💻"},
     
-    # AICITSS (Final) -> Channel 2
+    # AICITSS (Final) -> CHANNEL_FINAL
     {"id": "48", "name": "Advanced ITT", "channel": CHANNEL_FINAL, "icon": "⚡"},
     {"id": "45", "name": "MCS Course (GMCS)", "channel": CHANNEL_FINAL, "icon": "👔"},
     {"id": "49", "name": "MCS Course (Weekend)", "channel": CHANNEL_FINAL, "icon": "👔"}
 ]
 
-REGION_ID = "2"  # Western Region
+REGION_ID = "3"  # Northern Region
 
+# All 24 Northern Region (NIRC) Branches extracted from portal
 BRANCHES_TO_CHECK = {
-    "JALGAON": "68",
-    "PUNE": "77",
-    "MUMBAI": "255",
-    "NASHIK": "74",
-    "AHMEDABAD": "56"
+    "DELHI": "254",
+    "CHANDIGARH": "19",
+    "GURUGRAM": "21",
+    "FARIDABAD": "20",
+    "LUDHIANA": "26",
+    "AMRITSAR": "17",
+    "JALANDHAR": "14",
+    "AMBALA": "16",
+    "BHATINDA": "18",
+    "BHIWANI": "278",
+    "BAHADURGARH": "272",
+    "HIMACHAL PRADESH": "22",
+    "HISAR": "23",
+    "JAMMU & KASHMIR": "24",
+    "KARNAL": "25",
+    "KURUKSHETRA": "277",
+    "PANIPAT": "28",
+    "PATIALA": "27",
+    "REWARI": "33",
+    "ROHTAK": "29",
+    "SANGRUR": "30",
+    "SIRSA": "34",
+    "SONEPAT": "31",
+    "YAMUNANAGAR": "32"
 }
 
 FALLBACK_VIEWSTATE = urllib.parse.unquote(
-    "%2FwEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgZkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUmCUFITUVEQUJBRApBSE1FRE5BR0FSBUFLT0xBCEFNUkFWQVRJBUFOQU5ECkFVUkFOR0FCQUQHQkhBUlVDSAlCSEFWTkFHQVIEQkhVSgVESFVMRQpHQU5ESElESEFNDEdBTkRISU5BR0FSIANHT0EMSWNoYWxrYXJhbmppB0pBTEdBT04ISkFNTkFHQVIOS2FseWFuRG9tYml2bGkIS09MSEFQVVIFTEFUVVIGTVVNQkFJBk5BR1BVUgZOQU5ERUQGTkFTSElLC05BVkkgTVVNQkFJB05BVlNBUkkQUElNUFJJIENISU5DSFdBRARQVU5FBlJBSktPVApSYXRhbmFnaXJpBlNBTkdMSQZTQVRBUkEHU09MQVBVUgVTVVJBVAVUSEFORQh0cnlzdXBlcghWYWRvZGFyYQRWQVBJBVZBU0FJFSYCNTYCNTcCNTgCNjACNTkCNjECNjMCNjQDMjY2AjY1AjY2AzI4MgI2NwMyNzQCNjgCNjkDMjY1AjcwAjcxAzI1NQI3MgI3MwI3NAI3NgI3NQI3OAI3NwI3OQMyNjkCODACODECODICODMCODQDMjYxAjYyAjg2Ajg1FCsDJmdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZGQCDw8QDxYGHwEFC2NvdXJzZV9uYW1lHwIFCWNvdXJzZV9pZB8DZ2QQFQUcQWR2YW5jZWQgKElDSVRTUykgTUNTIENvdXJzZSZBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlIC0gV2Vla2VuZClBSUNJVFNTIC0gQWR2YW5jZWQgSW5mb3JtYXRpb24gVGVjaG5vbG9neR9JQ0lUU1MgLSBJbmZvcm1hdGlvbiBUZWNobm9sb2d5G0lDSVRTUyAtIE9yaWVudGF0aW9uIENvdXJzZRUFAjQ1AjQ5AjQ4AjQ3AjQ2FCsDBWdnZ2dnZGQCEw9kFgJmD2QWAgIBDzwrABEDAA8WBB8DZx4LXyFJdGVtQ291bnQCAWQBEBYAFgAWAAwUKwAAFgJmD2QWBgIBD2QWFmYPZBYCAgEPDxYCHgRUZXh0BRRJQ0lUU1NPQ19fSkFMR0FPTl8xMWRkAgEPZBYCAgEPDxYCHwUFAjQ4ZGQCAg9kFgICAQ8PFgIfBQUKMTgvMTAvMjAyNmRkAgMPZBYCAgEPDxYCHwUFCjAxLzExLzIwMjZkZAIED2QWAgIBDw8WAh8FBRE4LTAtQU0gdG8gMi0zMC1QTWRkAgUPZBYCAgEPDxYCHwUFB0pBTEdBT05kZAIGD2QWAgIBDw8WAh8FBRtJQ0lUU1MgLSBPcmllbnRhdGlvbiBDb3Vyc2VkZAIHD2QWAgIBDw8WAh8FBQdHZW5lcmFsZGQCCA9kFgQCAQ8PFgIfBQUCNDZkZAIDDw8WAh8FBQEyZGQCCQ9kFgICAQ8PFgIfBQUKMTcvMDgvMjAyNmRkAgoPZBYCAgEPDxYCHwUFElJlZ2lzdHJhdGlvbiBTdGFydGRkAgIPDxYCHwBoZGQCAw8PFgIfAGhkZBgBBQlHcmlkVmlldzEPPCsADAEIAgFkQrpm6LsM2NU1AMgmZ%2FVjPpvuhjK%2BXW8KFr8vqx5L6Ho%3D"
+    "%2FwEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgRkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUYBkFNQkFMQQhBTVJJVFNBUgtCYWhhZHVyZ2FyaAhCaGF0aW5kYQdCSElXQU5JCkNIQU5ESUdBUkgFREVMSEkJRkFSSURBQkFECEd1cnVncmFtEEhJTUFDSEFMIFBSQURFU0gFSElTQVIJSkFMQU5ESEFSDUphbW11Jkthc2htaXIGS0FSTkFMC0t1cnVrc2hldHJhCExVREhJQU5BB1BBTklQQVQHUEFUSUFMQQZSRVdBUkkGUk9IVEFLB1NBTkdSVVIFU0lSU0EHU09ORVBBVAtZQU1VTkFOQUdBUhUYAjE2AjE3AzI3MgIxOAMyNzgCMTkDMjU0AjIwAjIxAjIyAjIzAjE0AjI0AjI1AzI3NwIyNgIyOAIyNwIzMwIyOQIzMAIzNAIzMQIzMhQrAxhnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dkZAIPDxAPFgYfAQULY291cnNlX25hbWUfAgUJY291cnNlX2lkHwNnZBAVBRxBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlJkFkdmFuY2VkIChJQ0lUU1MpIE1DUyBDb3Vyc2UgLSBXZWVrZW5kKUFJQ0lUU1MgLSBBZHZhbmNlZCBJbmZvcm1hdGlvbiBUZWNobm9sb2d5H0lDSVRTUyAtIEluZm9ybWF0aW9uIFRlY2hub2xvZ3kbSUNJVFNTIC0gT3JpZW50YXRpb24gQ291cnNlFQUCNDUCNDkCNDgCNDcCNDYUKwMFZ2dnZ2dkZAITD2QWAmYPZBYCAgEPPCsAEQIBEBYAFgAWAAwUKwAAZBgBBQlHcmlkVmlldzEPZ2S9EC9W9lwOJFL%2FPOY%2BW1%2BC0tTyogCGrFqqtbTQhPZDOA%3D%3D"
 )
 FALLBACK_EVENTVALIDATION = urllib.parse.unquote(
-    "%2FwEdADWt6592kFtp90VL2l8q6a0CBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F%2FRmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3kj2dHwvW82cujaYSiCkZ3sA9ZB91Hi9Hb4eSQCzCsWTr0zL%2F%2FrRmHUvq882TgElaDiAF1C15DShQJg3gLf3lIBSHkjRrhTv1gK%2FpfTt%2Bj0UqvFGMDYBctWFaudAlGyyom2tpbxbuqFVQa0ii1p%2F06xhhpNFv%2FptNOUicIA960rmZMS1R2hQsQTENvLg2JoqpJwo%2Bu1QKo3GadUL4kU7BPMW4r41v%2Fas%2Fjqz%2Bc3gK5Dg6Gix9t5pEuSWM8VlLuDA%2BhQ8ouPJD4lh19ggQRT9m%2ByKyrqt68fILF55VOdOBNniNPS2AFNQYQbtWz49tYHuHkirPaKyBDZHHpb6hilqKfE71zVWg6UO85R3Cu5VKOjdHxCdMzKi5w%2FNHcC0UDhMm2AfezN8hGv%2FdwZzolfDNabPd7NHiDshxfHCCF7RYhdBp5qDKfl7Q8B3xsnZA%2BpTX7BLmYS52zorp7Mo5%2BfYtnZMUNFTMQYWQvKImsPBvs2BsiVWYgA1%2FcGwVXOUX83EzIEhjUUHkyf8Ko4hSy1M6oBD4Dq%2Fxl5DN3fqI27no%2BEPb22d%2Bz3sdQbEZAx7Cd6pagjLwEz%2FjL2jk%2BPB2NU9qvd0a7Bu4U6sDaZwEe8HbKgtReP0w3R41UEL7KPhZFFYL4U%2FTCSCSOOEFh7xgwlhyvdWKLNhBIVeGRqWdDTr3wOGDxGIlb1UPRXn%2Fcp%2FX%2Fx1er9UblSXGkW8TsL7rmcYxIHVa6HOiXsJdx4k5V59u54LAjhLOcFrOCbR%2B0TLZ1yPzxhNBp58LV3C%2BSDQPNS5yIY6NCIsbOSWoJPjFmpjk9u%2B43%2FGIgdV4zOqQzLgbAk5LHRxRsrRN8LG0Syh5ICDtd5YdzudyqtGD4WIukGRxsM7zCt4OK0obpTHn3AdcEKmFh891O2LB9kbThRvuk76pdSnZ1Vn4DHFo0gVOLv3RSi7Y7vExhtpSYs0p0QACwwJIP2EmMQNHVKMKQvTgrCvl65"
+    "%2FwEdACdtJlGxILTIqjAlm%2FubZNQYBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F%2FRmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3mffdNPt7G97XzuvLC3pgO%2Bf5r4zuzY1%2BI4IOsX7n%2Fgm62MgvOqjvmBFLE3Fu7D0kTgValH0KNnMZNDfY%2Bgc11uT1B8beu9Xuih4VQ%2FRcDMeW91W6bk0m9LgmzdroYVw98zArUB0FZfGCzcx2R9vdismAW2KkmmvRvWLyuFFNfDaH4aDGJNeGZpjY7%2BSt5quKtH8fJRNtif4VJvLCHr0fvrO9L2lXyBrH8va6VXydAo4Qj%2FaGg2KKw%2FTwAn3hy6JUQImsmxJWW%2FROt5NUvup4%2FXlW4TBWDBhGcBf1TTA5oF%2BUwntHQTzzYaFv5PW1bR5RJPnBoCK26PmctL%2B3KVAcsIWPey1bwufGvvMAdUffLE3cU78dXNwx5fL5heEd7XXtj%2FGMWmEjC11DdBpm%2FotuGDXQWZVkFozyqCoyvtiueutWbT68pekcf6y9t8iu0bfdrzXbDPwJfD%2Fi7ffrd6fTlHBDNr8J5BXrTRmVliLuOx7wbrpmr8zfE5YXFmQlMRvfON%2FxiIHVeMzqkMy4GwJOSx0cUbK0TfCxtEsoeSAg7XeWHc7ncqrRg%2BFiLpBkcbDO8wreDitKG6Ux59wHXBCphYfPdTtiwfZG04Ub7pO%2BqXUp2dVZ%2BAxxaNIFTi790Uou343WyvsxpPvq%2FtihCzO1o53xGaklGO6qhLUAZhZDs5FA%3D%3D"
 )
 
 HEADERS = {
@@ -69,7 +89,7 @@ def send_telegram_alert(batch, course):
         return False
 
     text = (
-        f"{course['icon']} <b>New ICAI {course['name']} Batch Announced!</b>\n\n"
+        f"{course['icon']} <b>[NIRC] New ICAI {course['name']} Batch!</b>\n\n"
         f"📍 <b>Centre:</b> {batch['pou']}\n"
         f"🆔 <b>Batch Code:</b> <code>{batch['batch_no']}</code>\n"
         f"📅 <b>Dates:</b> {batch['from_date']} to {batch['to_date']}\n"
@@ -90,8 +110,8 @@ def send_telegram_alert(batch, course):
     try:
         res = requests.post(api_url, json=payload, timeout=10)
         res.raise_for_status()
-        print(f"[{course['name']}] Sent alert for: {batch['batch_no']} -> {course['channel']}")
-        time.sleep(1.5)  # Telegram anti-rate-limit delay
+        print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> {course['channel']}")
+        time.sleep(1.5)  # Telegram rate limit compliance
         return True
     except Exception as e:
         print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
@@ -146,26 +166,32 @@ def main():
     session = requests.Session()
 
     print("Fetching fresh session tokens from portal...")
-    res = session.get(URL, headers=HEADERS, timeout=20)
-    soup = BeautifulSoup(res.text, "html.parser")
+    try:
+        res = session.get(URL, headers=HEADERS, timeout=20)
+        soup = BeautifulSoup(res.text, "html.parser")
 
-    vs = soup.find("input", {"id": "__VIEWSTATE"})
-    ev = soup.find("input", {"id": "__EVENTVALIDATION"})
-    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
+        vs = soup.find("input", {"id": "__VIEWSTATE"})
+        ev = soup.find("input", {"id": "__EVENTVALIDATION"})
+        gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
 
-    live_vs = vs.get("value", "") if vs else ""
-    live_ev = ev.get("value", "") if ev else ""
-    live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
+        live_vs = vs.get("value", "") if vs else ""
+        live_ev = ev.get("value", "") if ev else ""
+        live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
+    except Exception as e:
+        print(f"Initial get request failed: {e}. Falling back directly to saved tokens.")
+        live_vs, live_ev, live_gen = "", "", "10EF2921"
 
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
                 # Primary attempt
-                post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
-                table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
+                table = None
+                if live_vs and live_ev:
+                    post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
+                    table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-                # Fallback attempt if dynamic validation expires
+                # Fallback to verified tokens if dynamic validation failed or wasn't loaded
                 if not table:
                     post_res = query_portal(
                         session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
@@ -176,6 +202,8 @@ def main():
                     continue
 
                 batches = parse_batches(table)
+                print(f"[{branch_name}] Found {len(batches)} batches.")
+
                 for b in batches:
                     if b["batch_no"] not in seen_batches:
                         if send_telegram_alert(b, course):
