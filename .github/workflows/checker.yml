@@ -5,12 +5,17 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check-all-regions:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,5 +39,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
           git add -A
           git diff --staged --quiet || (git commit -m "Auto-update regional state & topic maps [skip ci]" && git push)
