@@ -11,8 +11,8 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 DATA_FILE = "seen_batches.json"
 
 # --- CONFIGURE YOUR TWO NIRC CHANNELS HERE ---
-CHANNEL_INTER = "@YOUR_NIRC_INTER"  # Orientation Course & ITT
-CHANNEL_FINAL = "@YOUR_NIRC_FINAL"  # Adv ITT & GMCS (MCS)
+CHANNEL_INTER = "@ITOCreminder"  # Orientation Course & ITT
+CHANNEL_FINAL = "@ADVITTGMCSreminder"  # Adv ITT & GMCS (MCS)
 
 # --- COURSES CONFIGURATION ---
 COURSES_TO_CHECK = [
