@@ -12,7 +12,7 @@ SEEN_DATA_FILE = "seen_batches_wirc.json"
 TOPICS_FILE = "topics_wirc.json"
 
 # Telegram Supergroup Chat IDs
-GROUP_INTER_ID = -1004311030177
+GROUP_INTER_ID = -1003700354486
 GROUP_FINAL_ID = -1003906764845
 
 # Dedicated high-density topics (all others go to 'Other WIRC Branches')
