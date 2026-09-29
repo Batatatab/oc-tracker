@@ -11,34 +11,27 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 SEEN_DATA_FILE = "seen_batches_nirc.json"
 TOPICS_FILE = "topics_nirc.json"
 
-# --- INSERT YOUR NIRC TELEGRAM GROUP IDs HERE ---
-# (Can be the same group ID for testing, or separate groups for Inter & Final)
-GROUP_INTER_ID = -1004425118828  
-GROUP_FINAL_ID = -1003702612974  
+# Telegram Supergroup Chat IDs
+# Use your dedicated NIRC group IDs, or your shared Inter/Final IDs:
+GROUP_INTER_ID = -1003700354486
+GROUP_FINAL_ID = -1003906764845
 
-# Dedicated high-density topics (all others route to 'Other NIRC Branches')
+# Dedicated high-density topics only (Himachal & others route to 'Other NIRC Branches')
 HIGH_DENSITY_BRANCHES = {
-    "HIMACHAL PRADESH": "🏔️ Himachal Pradesh",
     "DELHI": "🏢 Delhi",
     "CHANDIGARH": "🏛️ Chandigarh",
     "GURUGRAM": "🏙️ Gurugram",
     "FARIDABAD": "🏭 Faridabad",
-    "LUDHIANA": "🧵 Ludhiana",
-    "AMRITSAR": "🛕 Amritsar",
-    "JALANDHAR": "⚽ Jalandhar",
-    "JAMMU & KASHMIR": "❄️ Jammu & Kashmir",
-    "KARNAL": "🌾 Karnal",
-    "ROHTAK": "🏫 Rohtak",
-    "PANIPAT": "🧶 Panipat"
+    "LUDHIANA": "🧵 Ludhiana"
 }
 CATCH_ALL_TOPIC_NAME = "📍 Other NIRC Branches"
 
 COURSES_TO_CHECK = [
-    # ICITSS -> Inter
+    # ICITSS -> Inter Group
     {"id": "46", "name": "Orientation Course (OC)", "tier": "INTER", "group_id": GROUP_INTER_ID, "icon": "🎓"},
     {"id": "47", "name": "Information Technology (ITT)", "tier": "INTER", "group_id": GROUP_INTER_ID, "icon": "💻"},
     
-    # AICITSS -> Final
+    # AICITSS -> Final Group
     {"id": "48", "name": "Advanced ITT", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "⚡"},
     {"id": "45", "name": "MCS Course (GMCS)", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "👔"},
     {"id": "49", "name": "MCS Course (Weekend)", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "👔"}
@@ -100,14 +93,13 @@ def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def get_or_create_topic(group_id, topic_name, topics_map):
-    group_key = str(group_id)
-    if group_key not in topics_map:
-        topics_map[group_key] = {}
+def get_or_create_topic(group_id, tier, topic_name, topics_map):
+    tier_key = tier.upper()
+    if tier_key not in topics_map:
+        topics_map[tier_key] = {}
 
-    # Check cache by group ID
-    if topic_name in topics_map[group_key]:
-        return topics_map[group_key][topic_name]
+    if topic_name in topics_map[tier_key]:
+        return topics_map[tier_key][topic_name]
 
     if not BOT_TOKEN:
         return None
@@ -123,9 +115,9 @@ def get_or_create_topic(group_id, topic_name, topics_map):
         data = res.json()
         if data.get("ok"):
             thread_id = data["result"]["message_thread_id"]
-            topics_map[group_key][topic_name] = thread_id
+            topics_map[tier_key][topic_name] = thread_id
             save_json(TOPICS_FILE, topics_map)
-            print(f"Created topic: '{topic_name}' in group {group_id} (Thread: {thread_id})")
+            print(f"[{tier}] Created topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
             time.sleep(1.0)
             return thread_id
         else:
@@ -229,7 +221,7 @@ def query_portal(session, course_id, branch_code, viewstate, eventval, viewstate
 
 def main():
     seen_batches = set(load_json(SEEN_DATA_FILE, []))
-    topics_map = load_json(TOPICS_FILE, {})
+    topics_map = load_json(TOPICS_FILE, {"INTER": {}, "FINAL": {}})
     newly_seen = set()
     session = requests.Session()
 
@@ -269,9 +261,9 @@ def main():
 
                 batches = parse_batches(table)
 
-                # Fetch or create topic (keyed by group ID)
+                # Determine target forum topic
                 topic_title = HIGH_DENSITY_BRANCHES.get(branch_name, CATCH_ALL_TOPIC_NAME)
-                thread_id = get_or_create_topic(course["group_id"], topic_title, topics_map)
+                thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
 
                 for b in batches:
                     if b["batch_no"] not in seen_batches:
