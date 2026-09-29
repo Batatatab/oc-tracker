@@ -1,4 +1,4 @@
-name: ICAI OC Batch Checker
+name: ICAI Multi-Region Batch Checker
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  check:
+  check-all-regions:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,14 +20,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Scraper
+      - name: Run NIRC Scraper
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        run: python scraper.py
+        run: python scraper_nirc.py
+
+      - name: Run WIRC Scraper
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python scraper_wirc.py
 
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add seen_batches.json
-          git diff --staged --quiet || (git commit -m "Auto-update seen batches [skip ci]" && git push)
+          git add seen_batches_nirc.json seen_batches_wirc.json
+          git diff --staged --quiet || (git commit -m "Auto-update regional state files [skip ci]" && git push)
