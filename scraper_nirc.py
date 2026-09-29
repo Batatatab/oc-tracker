@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 URL = "https://www.icaionlineregistration.org/launchbatchdetail.aspx"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-DATA_FILE = "seen_batches.json"
+DATA_FILE = "seen_batches_nirc.json"
 
 # --- CONFIGURE YOUR TWO NIRC CHANNELS HERE ---
 CHANNEL_INTER = "@ITOCreminder"  # Orientation Course & ITT
