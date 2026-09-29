@@ -8,27 +8,43 @@ from bs4 import BeautifulSoup
 
 URL = "https://www.icaionlineregistration.org/launchbatchdetail.aspx"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-DATA_FILE = "seen_batches_wirc.json"
+SEEN_DATA_FILE = "seen_batches_wirc.json"
+TOPICS_FILE = "topics_wirc.json"
 
-# --- CONFIGURE YOUR TWO WIRC CHANNELS HERE ---
-CHANNEL_INTER = "@WITOCreminder"  # Orientation Course & ITT
-CHANNEL_FINAL = "@WADVITTGMCSreminder"  # Adv ITT & GMCS (MCS)
+# Telegram Supergroup Chat IDs
+GROUP_INTER_ID = -1004311030177
+GROUP_FINAL_ID = -1003906764845
 
-# --- COURSES CONFIGURATION ---
+# Dedicated high-density topics (all others go to 'Other WIRC Branches')
+HIGH_DENSITY_BRANCHES = {
+    "GOA": "🌴 Goa",
+    "MUMBAI": "🏢 Mumbai",
+    "PUNE": "🏛️ Pune",
+    "AHMEDABAD": "🏙️ Ahmedabad",
+    "SURAT": "💎 Surat",
+    "NAGPUR": "🍊 Nagpur",
+    "VADODARA": "🏭 Vadodara",
+    "NASHIK": "🍇 Nashik",
+    "THANE": "🌆 Thane",
+    "NAVI MUMBAI": "🌉 Navi Mumbai",
+    "PIMPRI CHINCHWAD": "🏗️ Pimpri Chinchwad",
+    "JALGAON": "🍌 Jalgaon"
+}
+CATCH_ALL_TOPIC_NAME = "📍 Other WIRC Branches"
+
 COURSES_TO_CHECK = [
-    # ICITSS (Inter) -> CHANNEL_INTER
-    {"id": "46", "name": "Orientation Course (OC)", "channel": CHANNEL_INTER, "icon": "🎓"},
-    {"id": "47", "name": "Information Technology (ITT)", "channel": CHANNEL_INTER, "icon": "💻"},
+    # ICITSS -> Inter Group
+    {"id": "46", "name": "Orientation Course (OC)", "tier": "INTER", "group_id": GROUP_INTER_ID, "icon": "🎓"},
+    {"id": "47", "name": "Information Technology (ITT)", "tier": "INTER", "group_id": GROUP_INTER_ID, "icon": "💻"},
     
-    # AICITSS (Final) -> CHANNEL_FINAL
-    {"id": "48", "name": "Advanced ITT", "channel": CHANNEL_FINAL, "icon": "⚡"},
-    {"id": "45", "name": "MCS Course (GMCS)", "channel": CHANNEL_FINAL, "icon": "👔"},
-    {"id": "49", "name": "MCS Course (Weekend)", "channel": CHANNEL_FINAL, "icon": "👔"}
+    # AICITSS -> Final Group
+    {"id": "48", "name": "Advanced ITT", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "⚡"},
+    {"id": "45", "name": "MCS Course (GMCS)", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "👔"},
+    {"id": "49", "name": "MCS Course (Weekend)", "tier": "FINAL", "group_id": GROUP_FINAL_ID, "icon": "👔"}
 ]
 
-REGION_ID = "2"  # Western Region
+REGION_ID = "2"
 
-# All 37 Western Region (WIRC) Branches
 BRANCHES_TO_CHECK = {
     "MUMBAI": "255",
     "PUNE": "77",
@@ -83,20 +99,54 @@ HEADERS = {
     "Referer": "https://www.icaionlineregistration.org/launchbatchdetail.aspx",
 }
 
-def load_seen_batches():
-    if os.path.exists(DATA_FILE):
+def load_json(filepath, default):
+    if os.path.exists(filepath):
         try:
-            with open(DATA_FILE, "r") as f:
-                return set(json.load(f))
+            with open(filepath, "r") as f:
+                return json.load(f)
         except Exception:
-            return set()
-    return set()
+            return default
+    return default
 
-def save_seen_batches(seen_batches):
-    with open(DATA_FILE, "w") as f:
-        json.dump(sorted(list(seen_batches)), f, indent=2)
+def save_json(filepath, data):
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
 
-def send_telegram_alert(batch, course, max_retries=3):
+def get_or_create_topic(group_id, tier, topic_name, topics_map):
+    tier_key = tier.upper()
+    if tier_key not in topics_map:
+        topics_map[tier_key] = {}
+
+    if topic_name in topics_map[tier_key]:
+        return topics_map[tier_key][topic_name]
+
+    if not BOT_TOKEN:
+        return None
+
+    api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createForumTopic"
+    payload = {
+        "chat_id": group_id,
+        "name": topic_name
+    }
+
+    try:
+        res = requests.post(api_url, json=payload, timeout=10)
+        data = res.json()
+        if data.get("ok"):
+            thread_id = data["result"]["message_thread_id"]
+            topics_map[tier_key][topic_name] = thread_id
+            save_json(TOPICS_FILE, topics_map)
+            print(f"[{tier}] Created topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
+            time.sleep(1.0)
+            return thread_id
+        else:
+            print(f"Failed to create topic '{topic_name}' in group {group_id}: {data}")
+            return None
+    except Exception as e:
+        print(f"Error creating topic '{topic_name}': {e}")
+        return None
+
+def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
     if not BOT_TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN is not set.")
         return False
@@ -114,36 +164,35 @@ def send_telegram_alert(batch, course, max_retries=3):
 
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": course["channel"],
+        "chat_id": group_id,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
+    if thread_id:
+        payload["message_thread_id"] = thread_id
 
     for attempt in range(max_retries):
         try:
             res = requests.post(api_url, json=payload, timeout=10)
-            
             if res.status_code == 429:
                 wait_time = 5
                 try:
                     wait_time = res.json().get("parameters", {}).get("retry_after", 5)
                 except Exception:
                     pass
-                print(f"[Rate Limit] Pausing {wait_time + 1}s before retry (attempt {attempt + 1}/{max_retries})...")
+                print(f"[Rate Limit] Pausing {wait_time + 1}s before retry...")
                 time.sleep(wait_time + 1)
                 continue
 
             res.raise_for_status()
-            print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> {course['channel']}")
+            print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> Group {group_id} (Topic: {thread_id})")
             time.sleep(2.0)
             return True
-
         except Exception as e:
             print(f"Attempt {attempt + 1} failed for {batch['batch_no']}: {e}")
             time.sleep(2.0)
 
-    print(f"Permanently failed to deliver alert for {batch['batch_no']} after {max_retries} retries.")
     return False
 
 def find_batch_table(soup):
@@ -190,7 +239,8 @@ def query_portal(session, course_id, branch_code, viewstate, eventval, viewstate
     return session.post(URL, data=payload, headers=HEADERS, timeout=20)
 
 def main():
-    seen_batches = load_seen_batches()
+    seen_batches = set(load_json(SEEN_DATA_FILE, []))
+    topics_map = load_json(TOPICS_FILE, {"INTER": {}, "FINAL": {}})
     newly_seen = set()
     session = requests.Session()
 
@@ -211,7 +261,7 @@ def main():
         live_vs, live_ev, live_gen = "", "", "10EF2921"
 
     for course in COURSES_TO_CHECK:
-        print(f"\n================ Scanning WIRC: {course['name']} ================")
+        print(f"\n================ Scanning WIRC [{course['tier']}]: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
                 table = None
@@ -229,11 +279,14 @@ def main():
                     continue
 
                 batches = parse_batches(table)
-                print(f"[{branch_name}] Found {len(batches)} batches.")
+
+                # Pick city topic title or catch-all
+                topic_title = HIGH_DENSITY_BRANCHES.get(branch_name, CATCH_ALL_TOPIC_NAME)
+                thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
 
                 for b in batches:
                     if b["batch_no"] not in seen_batches:
-                        if send_telegram_alert(b, course):
+                        if send_telegram_alert(b, course, course["group_id"], thread_id):
                             seen_batches.add(b["batch_no"])
                             newly_seen.add(b["batch_no"])
 
@@ -241,10 +294,10 @@ def main():
                 print(f"Error querying {course['name']} @ {branch_name}: {e}")
 
     if newly_seen:
-        save_seen_batches(seen_batches)
+        save_json(SEEN_DATA_FILE, sorted(list(seen_batches)))
         print(f"\n[WIRC] Run complete: recorded {len(newly_seen)} new batches.")
     else:
-        print("\n[WIRC] Run complete: no new batches detected across any courses.")
+        print("\n[WIRC] Run complete: no new batches detected.")
 
 if __name__ == "__main__":
     main()
