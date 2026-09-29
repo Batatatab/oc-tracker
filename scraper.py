@@ -11,8 +11,8 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 DATA_FILE = "seen_batches.json"
 
 # --- CONFIGURE YOUR TWO NIRC CHANNELS HERE ---
-CHANNEL_INTER = "@ITOCreminder"  # Orientation Course & ITT
-CHANNEL_FINAL = "@ADVITTGMCSreminder"  # Adv ITT & GMCS (MCS)
+CHANNEL_INTER = "@YOUR_NIRC_INTER"  # Orientation Course & ITT
+CHANNEL_FINAL = "@YOUR_NIRC_FINAL"  # Adv ITT & GMCS (MCS)
 
 # --- COURSES CONFIGURATION ---
 COURSES_TO_CHECK = [
@@ -28,7 +28,7 @@ COURSES_TO_CHECK = [
 
 REGION_ID = "3"  # Northern Region
 
-# All 24 Northern Region (NIRC) Branches extracted from portal
+# All 24 Northern Region (NIRC) Branches
 BRANCHES_TO_CHECK = {
     "DELHI": "254",
     "CHANDIGARH": "19",
@@ -83,7 +83,7 @@ def save_seen_batches(seen_batches):
     with open(DATA_FILE, "w") as f:
         json.dump(sorted(list(seen_batches)), f, indent=2)
 
-def send_telegram_alert(batch, course):
+def send_telegram_alert(batch, course, max_retries=3):
     if not BOT_TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN is not set.")
         return False
@@ -106,16 +106,33 @@ def send_telegram_alert(batch, course):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-    
-    try:
-        res = requests.post(api_url, json=payload, timeout=10)
-        res.raise_for_status()
-        print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> {course['channel']}")
-        time.sleep(1.5)  # Telegram rate limit compliance
-        return True
-    except Exception as e:
-        print(f"Failed to send Telegram message for {batch['batch_no']}: {e}")
-        return False
+
+    for attempt in range(max_retries):
+        try:
+            res = requests.post(api_url, json=payload, timeout=10)
+            
+            # Catch 429 Too Many Requests and pause for the requested duration
+            if res.status_code == 429:
+                wait_time = 5
+                try:
+                    wait_time = res.json().get("parameters", {}).get("retry_after", 5)
+                except Exception:
+                    pass
+                print(f"[Rate Limit] Pausing {wait_time + 1}s before retry (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(wait_time + 1)
+                continue
+
+            res.raise_for_status()
+            print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> {course['channel']}")
+            time.sleep(2.0)  # Safe cooldown between messages
+            return True
+
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed for {batch['batch_no']}: {e}")
+            time.sleep(2.0)
+
+    print(f"Permanently failed to deliver alert for {batch['batch_no']} after {max_retries} retries.")
+    return False
 
 def find_batch_table(soup):
     for table in soup.find_all("table"):
@@ -185,13 +202,11 @@ def main():
         print(f"\n================ Scanning: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                # Primary attempt
                 table = None
                 if live_vs and live_ev:
                     post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
                     table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-                # Fallback to verified tokens if dynamic validation failed or wasn't loaded
                 if not table:
                     post_res = query_portal(
                         session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
@@ -202,7 +217,6 @@ def main():
                     continue
 
                 batches = parse_batches(table)
-                print(f"[{branch_name}] Found {len(batches)} batches.")
 
                 for b in batches:
                     if b["batch_no"] not in seen_batches:
