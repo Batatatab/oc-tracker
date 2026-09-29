@@ -13,8 +13,8 @@ TOPICS_FILE = "topics_nirc.json"
 
 # Telegram Supergroup Chat IDs
 # Use your dedicated NIRC group IDs, or your shared Inter/Final IDs:
-GROUP_INTER_ID = -1003700354486
-GROUP_FINAL_ID = -1003906764845
+GROUP_INTER_ID = -1004425118828
+GROUP_FINAL_ID = -1003702612974
 
 # Dedicated high-density topics only (Himachal & others route to 'Other NIRC Branches')
 HIGH_DENSITY_BRANCHES = {
