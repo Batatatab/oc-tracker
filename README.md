@@ -36,7 +36,7 @@ I basically vibecoded this whole thing because checking the ICAI portal manually
 
 #### 1. Fork or clone this repo
 ```bash
-git clone [https://github.com/YOUR_USERNAME/YOUR_REPO.git](https://github.com/YOUR_USERNAME/YOUR_REPO.git)
+git clone [https://github.com/Batatatab/oc-tracker)
 cd YOUR_REPO
 ```
 
