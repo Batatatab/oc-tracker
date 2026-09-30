@@ -1,24 +1,4 @@
 {
-  "INTER": {
-    "\ud83d\udd4c Agra": 144,
-    "\ud83d\udccd Other CIRC Branches": 146,
-    "\ud83c\udf0a Bhopal": 150,
-    "\ud83c\udfe2 Ghaziabad": 157,
-    "\ud83c\udf1f Indore": 162,
-    "\ud83c\udff0 Jaipur": 166,
-    "\ud83c\udfd9\ufe0f Meerut": 175,
-    "\ud83d\udcdc Patna": 177,
-    "\ud83d\udd4c Ajmer": 189
-  },
-  "FINAL": {
-    "\ud83d\udd4c Ajmer": 222,
-    "\ud83d\udccd Other CIRC Branches": 224,
-    "\ud83c\udf0a Bhopal": 233,
-    "\ud83c\udfe2 Ghaziabad": 243,
-    "\ud83c\udf1f Indore": 248,
-    "\ud83c\udff0 Jaipur": 252,
-    "\ud83c\udfd9\ufe0f Meerut": 265,
-    "\ud83d\udcdc Patna": 271,
-    "\ud83d\udd4c Agra": 281
-  }
+  "INTER": {},
+  "FINAL": {}
 }
