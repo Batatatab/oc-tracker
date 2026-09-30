@@ -44,8 +44,13 @@ jobs:
           python scraper_circ.py &
           PID_CIRC=$!
 
-          # Wait for all regional scrapers to complete
-          wait $PID_NIRC $PID_WIRC $PID_EIRC $PID_SIRC $PID_CIRC
+          # Wait for each regional scraper safely without aborting early on single-region failure
+          wait $PID_NIRC || echo "NIRC exited with error code $?"
+          wait $PID_WIRC || echo "WIRC exited with error code $?"
+          wait $PID_EIRC || echo "EIRC exited with error code $?"
+          wait $PID_SIRC || echo "SIRC exited with error code $?"
+          wait $PID_CIRC || echo "CIRC exited with error code $?"
+
           echo "All 5 regional scrapers completed execution."
 
       - name: Commit and push changes
