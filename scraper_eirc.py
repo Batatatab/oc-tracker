@@ -17,6 +17,7 @@ GROUP_FINAL_ID = -1004224921246
 # High-density focus branches in Eastern Region
 HIGH_DENSITY_BRANCHES = {
     "KOLKATA": "🏢 Kolkata",
+    "KOLKATA_HQ": "🏢 Kolkata",
     "BHUBANESWAR": "🏛️ Bhubaneswar",
     "GUWAHATI": "🌿 Guwahati",
     "SILIGURI": "🏔️ Siliguri",
@@ -38,6 +39,24 @@ COURSES_TO_CHECK = [
 ]
 
 REGION_ID = "1"  # Eastern Region
+
+# Eastern Region Branch Codes on ICAI Portal
+BRANCHES_TO_CHECK = {
+    "KOLKATA": "1",
+    "BHUBANESWAR": "2",
+    "CUTTACK": "3",
+    "GUWAHATI": "4",
+    "ROURKELA": "5",
+    "SILIGURI": "6",
+    "ASANSOL": "7",
+    "SAMBALPUR": "8",
+    "RANIGANJ": "9",
+    "BRAHMAPUR": "10",
+    "DIBRUGARH": "11",
+    "TINSUKIA": "12",
+    "SILCHAR": "13",
+    "KOLKATA_HQ": "255"
+}
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -166,79 +185,39 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def get_eirc_environment(session):
-    print("Connecting to ICAI portal...")
+def get_base_session_payload(session):
+    print("Connecting to ICAI portal for session tokens...")
     res = session.get(URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(res.text, "html.parser")
 
-    vs = soup.find("input", {"id": "__VIEWSTATE"}).get("value", "")
-    ev = soup.find("input", {"id": "__EVENTVALIDATION"}).get("value", "")
-    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"}).get("value", "10EF2921")
+    payload = {}
+    for inp in soup.find_all("input"):
+        name = inp.get("name")
+        if name:
+            payload[name] = inp.get("value", "")
 
-    # Replicate ASP.NET __doPostBack('ddl_reg', '') to populate Region 1 branches
-    postback_data = {
-        "__EVENTTARGET": "ddl_reg",
-        "__EVENTARGUMENT": "",
-        "__LASTFOCUS": "",
-        "__VIEWSTATE": vs,
-        "__VIEWSTATEGENERATOR": gen,
-        "__SCROLLPOSITIONX": "0",
-        "__SCROLLPOSITIONY": "0",
-        "__EVENTVALIDATION": ev,
-        "ddl_reg": REGION_ID
-    }
-
-    # Maintain existing select element values from GET
     for sel in soup.find_all("select"):
         name = sel.get("name")
-        if name and name != "ddl_reg":
+        if name:
             opt = sel.find("option", selected=True) or sel.find("option")
-            postback_data[name] = opt.get("value", "") if opt else ""
+            payload[name] = opt.get("value", "") if opt else ""
+
+    return payload
+
+def query_portal(session, course_id, branch_code, base_payload):
+    payload = dict(base_payload)
+    payload["__EVENTTARGET"] = ""
+    payload["__EVENTARGUMENT"] = ""
+    payload["__LASTFOCUS"] = ""
+    payload["ddl_reg"] = REGION_ID
+    payload["ddlPou"] = branch_code
+    payload["ddl_course"] = course_id
+    payload["btn_getlist"] = "Get List"
 
     post_headers = dict(HEADERS)
     post_headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-    print("Triggering Eastern Region ASP.NET postback...")
-    post_res = session.post(URL, data=postback_data, headers=post_headers, timeout=20)
-    post_soup = BeautifulSoup(post_res.text, "html.parser")
-
-    new_vs_tag = post_soup.find("input", {"id": "__VIEWSTATE"})
-    new_ev_tag = post_soup.find("input", {"id": "__EVENTVALIDATION"})
-    new_gen_tag = post_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
-
-    new_vs = new_vs_tag.get("value", vs) if new_vs_tag else vs
-    new_ev = new_ev_tag.get("value", ev) if new_ev_tag else ev
-    new_gen = new_gen_tag.get("value", gen) if new_gen_tag else gen
-
-    branches = {}
-    pou_select = post_soup.find("select", id=re.compile(r"pou", re.I))
-    if pou_select:
-        for opt in pou_select.find_all("option"):
-            val = opt.get("value", "").strip()
-            name = opt.text.strip()
-            if val and val.lower() != "select" and val != "0":
-                clean_name = re.sub(r'[^a-zA-Z\s]', '', name).strip().upper()
-                branches[clean_name] = val
-
-    print(f"Discovered {len(branches)} active branches for EIRC: {list(branches.keys())}")
-    return new_vs, new_ev, new_gen, branches
-
-def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen):
-    payload = {
-        "__EVENTTARGET": "",
-        "__EVENTARGUMENT": "",
-        "__LASTFOCUS": "",
-        "__VIEWSTATE": viewstate,
-        "__VIEWSTATEGENERATOR": viewstategen,
-        "__SCROLLPOSITIONX": "0",
-        "__SCROLLPOSITIONY": "0",
-        "__EVENTVALIDATION": eventval,
-        "ddl_reg": REGION_ID,
-        "ddlPou": branch_code,
-        "ddl_course": course_id,
-        "btn_getlist": "Get List"
-    }
-    return session.post(URL, data=payload, headers=HEADERS, timeout=20)
+    return session.post(URL, data=payload, headers=post_headers, timeout=20)
 
 def main():
     seen_batches = set(load_json(SEEN_DATA_FILE, []))
@@ -247,26 +226,24 @@ def main():
     session = requests.Session()
 
     try:
-        vs, ev, gen, branches_to_check = get_eirc_environment(session)
+        base_payload = get_base_session_payload(session)
     except Exception as e:
-        print(f"Portal handshake failed: {e}")
-        return
-
-    if not branches_to_check:
-        print("Portal returned zero branches for Region 1. Halting run.")
+        print(f"Failed to fetch session tokens from portal: {e}")
         return
 
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning EIRC [{course['tier']}]: {course['name']} ================")
-        for branch_name, branch_code in branches_to_check.items():
+        for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                res = query_portal(session, course["id"], branch_code, vs, ev, gen)
+                res = query_portal(session, course["id"], branch_code, base_payload)
                 table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
+
                 if not table:
+                    print(f"[{course['name']}] {branch_name.ljust(15)} -> 0 active batches")
                     continue
 
                 batches = parse_batches(table)
-                print(f"[{course['name']}] Found {len(batches)} batches in {branch_name}")
+                print(f"[{course['name']}] {branch_name.ljust(15)} -> FOUND {len(batches)} BATCHES")
 
                 topic_title = HIGH_DENSITY_BRANCHES.get(branch_name, CATCH_ALL_TOPIC_NAME)
                 thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
@@ -284,7 +261,7 @@ def main():
         save_json(SEEN_DATA_FILE, sorted(list(seen_batches)))
         print(f"\n[EIRC] Run complete: recorded {len(newly_seen)} new batches.")
     else:
-        print("\n[EIRC] Run complete: no new batches detected.")
+        print("\n[EIRC] Run complete: scan finished cleanly (no new batches).")
 
 if __name__ == "__main__":
     main()
