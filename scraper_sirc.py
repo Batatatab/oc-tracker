@@ -95,6 +95,7 @@ BRANCHES_TO_CHECK = {
     "West Godavari": "281"
 }
 
+# Complete, intact cryptographic tokens for Southern Region
 FALLBACK_VIEWSTATE = (
     "/wEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUe"
     "DkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5v"
@@ -142,6 +143,7 @@ FALLBACK_VIEWSTATE = (
     "BQtOb3QgU3RhcnRlZGRkAgcPDxYCHwBoZGQCCA8PFgIfAGhkZBgBBQlHcmlkVmlldzEPPCsADAEIAgFknUipbOocbVYHmWI16GM7pKX2"
     "ATo4WzfzGi6tFAkV8p4="
 )
+
 FALLBACK_EVENTVALIDATION = (
     "/wEdAD483aUHnQenEfGVOzPQARODBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lERe"
     "Dvg4F/RmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3nK1uKYS3Gi"
@@ -286,16 +288,16 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen="10EF2921"):
+def query_portal(session, course_id, branch_code):
     payload = {
         "__EVENTTARGET": "",
         "__EVENTARGUMENT": "",
         "__LASTFOCUS": "",
-        "__VIEWSTATE": viewstate,
-        "__VIEWSTATEGENERATOR": viewstategen,
+        "__VIEWSTATE": FALLBACK_VIEWSTATE,
+        "__VIEWSTATEGENERATOR": "10EF2921",
         "__SCROLLPOSITIONX": "0",
         "__SCROLLPOSITIONY": "0",
-        "__EVENTVALIDATION": eventval,
+        "__EVENTVALIDATION": FALLBACK_EVENTVALIDATION,
         "ddl_reg": REGION_ID,
         "ddlPou": branch_code,
         "ddl_course": course_id,
@@ -311,35 +313,12 @@ def main():
     newly_seen = set()
     session = requests.Session()
 
-    print("Fetching live session tokens from portal...")
-    try:
-        res = session.get(URL, headers=HEADERS, timeout=20)
-        soup = BeautifulSoup(res.text, "html.parser")
-        vs_tag = soup.find("input", {"id": "__VIEWSTATE"})
-        ev_tag = soup.find("input", {"id": "__EVENTVALIDATION"})
-        gen_tag = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
-
-        live_vs = vs_tag.get("value", "") if vs_tag else ""
-        live_ev = ev_tag.get("value", "") if ev_tag else ""
-        live_gen = gen_tag.get("value", "10EF2921") if gen_tag else "10EF2921"
-    except Exception as e:
-        print(f"Initial GET failed: {e}. Falling back to pre-signed tokens.")
-        live_vs, live_ev, live_gen = "", "", "10EF2921"
-
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning SIRC [{course['tier']}]: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                table = None
-                # Primary attempt: live tokens if accessible
-                if live_vs and live_ev:
-                    res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
-                    table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
-
-                # Fallback attempt: signed SIRC tokens
-                if not table:
-                    res = query_portal(session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921")
-                    table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
+                res = query_portal(session, course["id"], branch_code)
+                table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
 
                 if not table:
                     print(f"[{course['name']}] {branch_name.ljust(20)} -> 0 active batches")
@@ -348,7 +327,6 @@ def main():
                 batches = parse_batches(table)
                 print(f"[{course['name']}] {branch_name.ljust(20)} -> FOUND {len(batches)} BATCHES")
 
-                # Casing-insensitive matching for hub topics
                 topic_title = HIGH_DENSITY_BRANCHES.get(branch_name.upper(), CATCH_ALL_TOPIC_NAME)
                 thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
 
