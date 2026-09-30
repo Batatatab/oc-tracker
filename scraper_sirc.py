@@ -3,6 +3,7 @@ import re
 import time
 import json
 import html
+import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 
@@ -95,11 +96,13 @@ BRANCHES_TO_CHECK = {
     "WEST GODAVARI": "281"
 }
 
-# Bit-for-bit uncorrupted Southern Region ViewState
-SIRC_VIEWSTATE = """/wEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgVkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUvCUFsYXBwdXpoYQlBbmFudGFwdXIHQmFsbGFyaQhCZWxhZ2F2aQlCRU5HQUxVUlUMQ2hlbmdhbHBhdHR1B0NIRU5OQUkKQ09JTUJBVE9SRQlFUk5BS1VMQU0FRVJPREUGR1VOVFVSCEhVQkJBTExJCUhZREVSQUJBRAZLQURBUEEIS0FLSU5BREEJS2FsYWJ1cmdpBktBTk5VUgpLQVJJTU5BR0FSBktvbGxhbQhLT1RUQVlBTQlLb3poaWtvZGUKS1VNQkFLT05BTQdLVVJOT09MB01BRFVSQUkJTWFuZ2FsdXJ1Bk15c3VydQdORUxMT1JFBk9OR09MRQhQYWxha2thZApQVURVQ0hFUlJZEVJBSkFNQUhFTkRSQVZBUkFNBVNBTEVNBFNJUkMIU0lWQUtBU0kSVGhpcnV2YW5hbnRoYXB1cmFtC1Rob290aHVrdWRpCFRocmlzc3VyDlRpcnVjaGlyYXBhbGxpC1RJUlVORUxWRUxJCFRJUlVQQVRJB1RJUlVQVVIFVURVUEkHVkVMTE9SRQpWSUpBWUFXQURBDVZJU0FLSEFQQVROQU0IV0FSQU5HQUwNV2VzdCBHb2RhdmFyaRUvAzEwMQMyNjADMTA0AzEwMwMxMDIDMjY4AzEzOAMxMDYDMTA3AzI1MgMxMDkDMTEwAzExMQMyNzkDMTEyAzI3MwMxMTMDMjU4AzEyMgMxMTQDMTA1AzExNQMyNDUDMTE2AzExNwMxMTgDMTE5AzI1OQMxMjADMTIxAzEyMwMxMjQDMjUxAzEyNQMxMzEDMTMyAzEzMAMxMjYDMTI3AzEyOAMxMjkDMTMzAzEzNAMxMzUDMTM2AzI0NgMyODEUKwMvZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dkZAIPDxAPFgYfAQULY291cnNlX25hbWUfAgUJY291cnNlX2lkHwNnZBAVBRxBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlJkFkdmFuY2VkIChJQ0lUU1MpIE1DUyBDb3Vyc2UgLSBXZWVrZW5kKUFJQ0lUU1MgLSBBZHZhbmNlZCBJbmZvcm1hdGlvbiBUZWNobm9sb2d5H0lDSVRTUyAtIEluZm9ybWF0aW9uIFRlY2hub2xvZ3kbSUNJVFNTIC0gT3JpZW50YXRpb24gQ291cnNlFQUCNDUCNDkCNDgCNDcCNDYUKwMFZ2dnZ2dkZAITD2QWAmYPZBYCAgEPPCsAEQMADxYEHwNnHgtfIUl0ZW1Db3VudGZkARAWAQIJFgE8KwAFAQAWAh8AaBYBAgYMFCsAAGQYAQUJR3JpZFZpZXcxDzwrAAwBCGZknb6lTo0j2DhVQ30COuTYIYvhuQPFt2h5ri6WsjILD4o=""".strip()
-
-# Bit-for-bit uncorrupted Southern Region EventValidation
-SIRC_EVENTVALIDATION = """/wEdAD5/e2jEPM/ZRHYzXC/qnjolBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F/RmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3nK1uKYS3Gi68/4c2xMtrvuObZcupe3bd4w1MvO+ZC7Yp126uGiE2JuyBo5cwQP0Gu7cSOL3+udQ2TBIOQOSLAdGbB9cfaCVQZ86pVUr60JPjq7z0Qvp5hPrVt2vxmMHla53DJZQqagnF0mlbmz4Ka9Luo5RIwcyTTFd6THEIdMlUF9NBk+DuecPl6fd0wZpCR/mYsq5yYAazieHNbKobJAzynfIPAYQXqgZ7gHmahmhg5RsmyVw54jbEUdxNoyDeqI0in9bFSYGcH89WBqb8/wbas6eXwU3tBBycFDHdquZe7suztI+tny0668pnqNMv01hlQubnErvO0pe2kq9oPuJUmSVlCThqGli3RMjglnvPXcztUYLKThCC15lHRaa7L8mMesddC9tYybJs3JOkIo4dcX/cUooiVp6MOjyi+/susmlZ81h0Trw25UBaxWuB4C5dE5hPWRbJgnN8wyr6P2iJFECo00p/9qP+mnBDa2oYeP8AQgsCz+/VAhClZ1ZExnKHQKlIEMuFR/8ZprOzsqaieS9qq0W3ucL/Kk6zhIkBzce2lWFtIfkXnjl61s1Qhj34CeJky0YAcMFYl70ApQZp4py2mFabGohSQ5mZu4azk+k1Fb2waK8Sif78/4FpdqajnrnWt28Z54bncjAFwJGU7UUEIhvTiLhpeB6CyEvOKBGMvxBHc8Q6EKvWj5Oh8Yp3f1/ecSc9+ASFYYYh6XBViwl/E37a6jw3mAUZcM1ZAKtTrJHMVCi2elio1TXDycnolUflm6rnDyuQD5fNaPzr1kn5pjIyrG5TPIjcqvAvY3Gw66Uk79WV0zCK2tysM2c7zi2zLuqXEuNLHxpUYobghHth7CZhkwJ/cCqopp/zBI57I60ZH4tmKnLGHog/xDYz6VkmtiHo52Y7icSgI7Bag8q5TNZyHxSvi+gnbqrVBKg4kMoun+wl9MPMqJaAdO5Rq3JszBCXUiJtuqk1xUKLeArIVMQI3+3K8EA6D73Y3/GIgdV4zOqQzLgbAk5LHRxRsrRN8LG0Syh5ICDtd5YdzudyqtGD4WIukGRxsM7zCt4OK0obphfn3AdcEKmFh891O2LB9kbThRvuk76pdSnZ1Vn4DHFo0gVOLv3RSi7TbSIs4gM1Ewq4gdOwiIcvJHBlwKOPzTmNSCDCzQXGMF""".strip()
+# Original uncorrupted token pair for SIRC fallback
+FALLBACK_VIEWSTATE = urllib.parse.unquote(
+    "%2FwEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgVkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBUvCUFsYXBwdXpoYQlBbmFudGFwdXIHQmFsbGFyaQhCZWxhZ2F2aQlCRU5HQUxVUlUMQ2hlbmdhbHBhdHR1B0NIRU5OQUkKQ09JTUJBVE9SRQlFUk5BS1VMQU0FRVJPREUGR1VOVFVSCEhVQkJBTExJCUhZREVSQUJBRAZLQURBUEEIS0FLSU5BREEJS2FsYWJ1cmdpBktBTk5VUgpLQVJJTU5BR0FSBktvbGxhbQhLT1RUQVlBTQlLb3poaWtvZGUKS1VNQkFLT05BTQdLVVJOT09MB01BRFVSQUkJTWFuZ2FsdXJ1Bk15c3VydQdORUxMT1JFBk9OR09MRQhQYWxha2thZApQVURVQ0hFUlJZEVJBSkFNQUhFTkRSQVZBUkFNBVNBTEVNBFNJUkMIU0lWQUtBU0kSVGhpcnV2YW5hbnRoYXB1cmFtC1Rob290aHVrdWRpCFRocmlzc3VyDlRpcnVjaGlyYXBhbGxpC1RJUlVORUxWRUxJCFRJUlVQQVRJB1RJUlVQVVIFVURVUEkHVkVMTE9SRQpWSUpBWUFXQURBDVZJU0FLSEFQQVROQU0IV0FSQU5HQUwNV2VzdCBHb2RhdmFyaRUvAzEwMQMyNjADMTA0AzEwMwMxMDIDMjY4AzEzOAMxMDYDMTA3AzI1MgMxMDkDMTEwAzExMQMyNzkDMTEyAzI3MwMxMTMDMjU4AzEyMgMxMTQDMTA1AzExNQMyNDUDMTE2AzExNwMxMTgDMTE5AzI1OQMxMjADMTIxAzEyMwMxMjQDMjUxAzEyNQMxMzEDMTMyAzEzMAMxMjYDMTI3AzEyOAMxMjkDMTMzAzEzNAMxMzUDMTM2AzI0NgMyODEUKwMvZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dkZAIPDxAPFgYfAQULY291cnNlX25hbWUfAgUJY291cnNlX2lkHwNnZBAVBRxBZHZhbmNlZCAoSUNJVFNTKSBNQ1MgQ291cnNlJkFkdmFuY2VkIChJQ0lUU1MpIE1DUyBDb3Vyc2UgLSBXZWVrZW5kKUFJQ0lUU1MgLSBBZHZhbmNlZCBJbmZvcm1hdGlvbiBUZWNobm9sb2d5H0lDSVRTUyAtIEluZm9ybWF0aW9uIFRlY2hub2xvZ3kbSUNJVFNTIC0gT3JpZW50YXRpb24gQ291cnNlFQUCNDUCNDkCNDgCNDcCNDYUKwMFZ2dnZ2dkZAITD2QWAmYPZBYCAgEPPCsAEQMADxYEHwNnHgtfIUl0ZW1Db3VudAICZAEQFgECCRYBPCsABQEAFgIfAGgWAQIGDBQrAAAWAmYPZBYIAgEPZBYWZg9kFgICAQ8PFgIeBFRleHQFF0lDSVRTU09DX19DT0lNQkFUT1JFXzM1ZGQCAQ9kFgICAQ8PFgIfBQUBMGRkAgIPZBYCAgEPDxYCHwUFCjA1LzEwLzIwMjZkZAIDD2QWAgIBDw8WAh8FBQoyMS8xMC8yMDI2ZGQCBA9kFgICAQ8PFgIfBQURMTAtMC1BTSB0byA1LTAtUE1kZAIFD2QWAgIBDw8WAh8FBQpDT0lNQkFUT1JFZGQCBg9kFgICAQ8PFgIfBQUbSUNJVFNTIC0gT3JpZW50YXRpb24gQ291cnNlZGQCBw9kFgICAQ8PFgIfBQUHR2VuZXJhbGRkAggPZBYEAgEPDxYCHwUFAjQ2ZGQCAw8PFgIfBQUCNTBkZAIJD2QWAgIBDw8WAh8FBQoyOS8wNy8yMDI2ZGQCCg9kFgICAQ8PFgIfBQULUmVnLiBDbG9zZWRkZAICD2QWFmYPZBYCAgEPDxYCHwUFF0lDSVRTU09DX19DT0lNQkFUT1JFXzM2ZGQCAQ9kFgICAQ8PFgIfBQUBOWRkAgIPZBYCAgEPDxYCHwUFCjA1LzEwLzIwMjZkZAIDD2QWAgIBDw8WAh8FBQoyMS8xMC8yMDI2ZGQCBA9kFgICAQ8PFgIfBQURMTAtMC1BTSB0byA1LTAtUE1kZAIFD2QWAgIBDw8WAh8FBQpDT0lNQkFUT1JFZGQCBg9kFgICAQ8PFgIfBQUbSUNJVFNTIC0gT3JpZW50YXRpb24gQ291cnNlZGQCBw9kFgICAQ8PFgIfBQUHR2VuZXJhbGRkAggPZBYEAgEPDxYCHwUFAjQ2ZGQCAw8PFgIfBQUCNDFkZAIJD2QWAgIBDw8WAh8FBQoxMi8wOC8yMDI2ZGQCCg9kFgICAQ8PFgIfBQUSUmVnaXN0cmF0aW9uIFN0YXJ0ZGQCAw8PFgIfAGhkZAIEDw8WAh8AaGRkGAEFCUdyaWRWaWV3MQ88KwAMAQgCAWRt71%2FK0tc5eIt54CFobtpRoS1opJs77zVkqDtkAy6n8A%3D%3D"
+)
+FALLBACK_EVENTVALIDATION = urllib.parse.unquote(
+    "%2FwEdAD5UlsV4HY3LzwX189wFKxFHBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F%2FRmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3nK1uKYS3Gi68%2F4c2xMtrvuObZcupe3bd4w1MvO%2BZC7Yp126uGiE2JuyBo5cwQP0Gu7cSOL3%2BudQ2TBIOQOSLAdGbB9cfaCVQZ86pVUr60JPjq7z0Qvp5hPrVt2vxmMHla53DJZQqagnF0mlbmz4Ka9Luo5RIwcyTTFd6THEIdMlUF9NBk%2BDuecPl6fd0wZpCR%2FmYsq5yYAazieHNbKobJAzynfIPAYQXqgZ7gHmahmhg5RsmyVw54jbEUdxNoyDeqI0in9bFSYGcH89WBqb8%2Fwbas6eXwU3tBBycFDHdquZe7suztI%2Btny0668pnqNMv01hlQubnErvO0pe2kq9oPuJUmSVlCThqGli3RMjglnvPXcztUYLKThCC15lHRaa7L8mMesddC9tYybJs3JOkIo4dcX%2FcUooiVp6MOjyi%2B%2FsusmlZ81h0Trw25UBaxWuB4C5dE5hPWRbJgnN8wyr6P2iJFECo00p%2F9qP%2BmnBDa2oYeP8AQgsCz%2B%2FVAhClZ1ZExnKHQKlIEMuFR%2F8ZprOzsqaieS9qq0W3ucL%2FKk6zhIkBzce2lWFtIfkXnjl61s1Qhj34CeJky0YAcMFYl70ApQZp4py2mFabGohSQ5mZu4azk%2Bk1Fb2waK8Sif78%2F4FpdqajnrnWt28Z54bncjAFwJGU7UUEIhvTiLhpeB6CyEvOKBGMvxBHc8Q6EKvWj5Oh8Yp3f1%2FecSc9%2BASFYYYh6XBViwl%2FE37a6jw3mAUZcM1ZAKtTrJHMVCi2elio1TXDycnolUflm6rnDyuQD5fNaPzr1kn5pjIyrG5TPIjcqvAvY3Gw66Uk79WV0zCK2tysM2c7zi2zLuqXEuNLHxpUYobghHth7CZhkwJ%2FcCqopp%2FzBI57I60ZH4tmKnLGHog%2FxDYz6VkmtiHo52Y7icSgI7Bag8q5TNZyHxSvi%2BgnbqrVBKg4kMoun%2Bwl9MPMqJaAdO5Rq3JszBCXUiJtuqk1xUKLeArIVMQI3%2B3K8EA6D73Y3%2FGIgdV4zOqQzLgbAk5LHRxRsrRN8LG0Syh5ICDtd5YdzudyqtGD4WIukGRxsM7zCt4OK0obpTHn3AdcEKmFh891O2LB9kbThRvuk76pdSnZ1Vn4DHFo0gVOLv3RSi7eXYjRTAEz8v2CuuUNik0HfoXDKNDUAwzPmxfkRz9lAf"
+)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -249,16 +252,16 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def query_portal(session, course_id, branch_code):
+def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen="10EF2921"):
     payload = {
         "__EVENTTARGET": "",
         "__EVENTARGUMENT": "",
         "__LASTFOCUS": "",
-        "__VIEWSTATE": SIRC_VIEWSTATE,
-        "__VIEWSTATEGENERATOR": "10EF2921",
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstategen,
         "__SCROLLPOSITIONX": "0",
         "__SCROLLPOSITIONY": "0",
-        "__EVENTVALIDATION": SIRC_EVENTVALIDATION,
+        "__EVENTVALIDATION": eventval,
         "ddl_reg": REGION_ID,
         "ddlPou": branch_code,
         "ddl_course": course_id,
@@ -274,17 +277,39 @@ def main():
     newly_seen = set()
     session = requests.Session()
 
+    print("Fetching fresh session tokens from portal...")
+    try:
+        res = session.get(URL, headers=HEADERS, timeout=20)
+        soup = BeautifulSoup(res.text, "html.parser")
+
+        vs = soup.find("input", {"id": "__VIEWSTATE"})
+        ev = soup.find("input", {"id": "__EVENTVALIDATION"})
+        gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
+
+        live_vs = vs.get("value", "") if vs else ""
+        live_ev = ev.get("value", "") if ev else ""
+        live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
+    except Exception as e:
+        print(f"Initial get request failed: {e}. Falling back to saved tokens.")
+        live_vs, live_ev, live_gen = "", "", "10EF2921"
+
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning SIRC [{course['tier']}]: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                res = query_portal(session, course["id"], branch_code)
+                table = None
+                if live_vs and live_ev:
+                    post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
+                    if post_res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-                if res.status_code != 200:
-                    print(f"[{course['name']}] {branch_name.ljust(20)} -> SERVER HTTP {res.status_code}")
-                    continue
+                if not table:
+                    post_res = query_portal(
+                        session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
+                    )
+                    if post_res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
-                table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
                 if not table:
                     continue
 
