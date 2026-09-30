@@ -17,7 +17,6 @@ GROUP_FINAL_ID = -1004224921246
 # High-density focus branches in Eastern Region
 HIGH_DENSITY_BRANCHES = {
     "KOLKATA": "🏢 Kolkata",
-    "KOLKATA_HQ": "🏢 Kolkata",
     "BHUBANESWAR": "🏛️ Bhubaneswar",
     "GUWAHATI": "🌿 Guwahati",
     "SILIGURI": "🏔️ Siliguri",
@@ -39,24 +38,6 @@ COURSES_TO_CHECK = [
 ]
 
 REGION_ID = "1"  # Eastern Region
-
-# Known Eastern Region Branch Mappings
-BRANCHES_TO_CHECK = {
-    "KOLKATA": "1",
-    "BHUBANESWAR": "2",
-    "CUTTACK": "3",
-    "GUWAHATI": "4",
-    "ROURKELA": "5",
-    "SILIGURI": "6",
-    "ASANSOL": "7",
-    "SAMBALPUR": "8",
-    "RANIGANJ": "9",
-    "BRAHMAPUR": "10",
-    "DIBRUGARH": "11",
-    "TINSUKIA": "12",
-    "SILCHAR": "13",
-    "KOLKATA_HQ": "255"
-}
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -185,45 +166,62 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def get_session_tokens(session):
-    print("Fetching initial session tokens from portal...")
+def get_eirc_environment(session):
+    print("Connecting to ICAI portal...")
     res = session.get(URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(res.text, "html.parser")
 
-    vs = soup.find("input", {"id": "__VIEWSTATE"})
-    ev = soup.find("input", {"id": "__EVENTVALIDATION"})
-    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
+    vs = soup.find("input", {"id": "__VIEWSTATE"}).get("value", "")
+    ev = soup.find("input", {"id": "__EVENTVALIDATION"}).get("value", "")
+    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"}).get("value", "10EF2921")
 
-    live_vs = vs.get("value", "") if vs else ""
-    live_ev = ev.get("value", "") if ev else ""
-    live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
+    # Replicate ASP.NET __doPostBack('ddl_reg', '') to populate Region 1 branches
+    postback_data = {
+        "__EVENTTARGET": "ddl_reg",
+        "__EVENTARGUMENT": "",
+        "__LASTFOCUS": "",
+        "__VIEWSTATE": vs,
+        "__VIEWSTATEGENERATOR": gen,
+        "__SCROLLPOSITIONX": "0",
+        "__SCROLLPOSITIONY": "0",
+        "__EVENTVALIDATION": ev,
+        "ddl_reg": REGION_ID
+    }
 
-    # Attempt server handshake for Region 1 to capture region-level EventValidation
-    try:
-        postback_payload = {
-            "__EVENTTARGET": "ddl_reg",
-            "__EVENTARGUMENT": "",
-            "__LASTFOCUS": "",
-            "__VIEWSTATE": live_vs,
-            "__VIEWSTATEGENERATOR": live_gen,
-            "__SCROLLPOSITIONX": "0",
-            "__SCROLLPOSITIONY": "0",
-            "__EVENTVALIDATION": live_ev,
-            "ddl_reg": REGION_ID,
-            "ddlPou": "Select",
-            "ddl_course": "Select"
-        }
-        r = session.post(URL, data=postback_payload, headers=HEADERS, timeout=15)
-        p_soup = BeautifulSoup(r.text, "html.parser")
-        p_vs = p_soup.find("input", {"id": "__VIEWSTATE"})
-        p_ev = p_soup.find("input", {"id": "__EVENTVALIDATION"})
-        if p_vs and p_ev:
-            print("Captured EIRC region postback tokens.")
-            return p_vs.get("value", live_vs), p_ev.get("value", live_ev), live_gen
-    except Exception as e:
-        print(f"Postback handshake skipped ({e}), falling back to direct tokens.")
+    # Maintain existing select element values from GET
+    for sel in soup.find_all("select"):
+        name = sel.get("name")
+        if name and name != "ddl_reg":
+            opt = sel.find("option", selected=True) or sel.find("option")
+            postback_data[name] = opt.get("value", "") if opt else ""
 
-    return live_vs, live_ev, live_gen
+    post_headers = dict(HEADERS)
+    post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    print("Triggering Eastern Region ASP.NET postback...")
+    post_res = session.post(URL, data=postback_data, headers=post_headers, timeout=20)
+    post_soup = BeautifulSoup(post_res.text, "html.parser")
+
+    new_vs_tag = post_soup.find("input", {"id": "__VIEWSTATE"})
+    new_ev_tag = post_soup.find("input", {"id": "__EVENTVALIDATION"})
+    new_gen_tag = post_soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
+
+    new_vs = new_vs_tag.get("value", vs) if new_vs_tag else vs
+    new_ev = new_ev_tag.get("value", ev) if new_ev_tag else ev
+    new_gen = new_gen_tag.get("value", gen) if new_gen_tag else gen
+
+    branches = {}
+    pou_select = post_soup.find("select", id=re.compile(r"pou", re.I))
+    if pou_select:
+        for opt in pou_select.find_all("option"):
+            val = opt.get("value", "").strip()
+            name = opt.text.strip()
+            if val and val.lower() != "select" and val != "0":
+                clean_name = re.sub(r'[^a-zA-Z\s]', '', name).strip().upper()
+                branches[clean_name] = val
+
+    print(f"Discovered {len(branches)} active branches for EIRC: {list(branches.keys())}")
+    return new_vs, new_ev, new_gen, branches
 
 def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen):
     payload = {
@@ -249,14 +247,18 @@ def main():
     session = requests.Session()
 
     try:
-        vs, ev, gen = get_session_tokens(session)
+        vs, ev, gen, branches_to_check = get_eirc_environment(session)
     except Exception as e:
-        print(f"Initial get request failed: {e}")
+        print(f"Portal handshake failed: {e}")
+        return
+
+    if not branches_to_check:
+        print("Portal returned zero branches for Region 1. Halting run.")
         return
 
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning EIRC [{course['tier']}]: {course['name']} ================")
-        for branch_name, branch_code in BRANCHES_TO_CHECK.items():
+        for branch_name, branch_code in branches_to_check.items():
             try:
                 res = query_portal(session, course["id"], branch_code, vs, ev, gen)
                 table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
