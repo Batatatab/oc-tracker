@@ -41,7 +41,6 @@ COURSES_TO_CHECK = [
 
 REGION_ID = "1"  # Eastern Region
 
-# Exact branch codes extracted from ICAI portal
 BRANCHES_TO_CHECK = {
     "KOLKATA": "53",
     "BHUBANESWAR": "44",
@@ -57,7 +56,7 @@ BRANCHES_TO_CHECK = {
     "EIRC": "248"
 }
 
-# Pre-signed Eastern Region cryptographic tokens
+# Pre-signed Eastern Region cryptographic tokens as emergency fallback
 FALLBACK_VIEWSTATE = (
     "/wEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUe"
     "DkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5v"
@@ -125,6 +124,59 @@ def load_json(filepath, default):
 def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
+
+def fetch_region_tokens(session, region_id):
+    """
+    Performs dynamic 2-step ASP.NET postback to acquire live tokens for the specified region.
+    Prevents HTTP 500 'Invalid postback or callback argument' errors.
+    """
+    print(f"Acquiring dynamic tokens for Region {region_id}...")
+    try:
+        # Step 1: Initial GET
+        r1 = session.get(URL, headers=HEADERS, timeout=20)
+        if r1.status_code != 200:
+            print(f"GET failed: HTTP {r1.status_code}")
+            return None, None, "10EF2921"
+
+        s1 = BeautifulSoup(r1.text, "html.parser")
+        vs1 = s1.find("input", {"id": "__VIEWSTATE"})
+        ev1 = s1.find("input", {"id": "__EVENTVALIDATION"})
+        gen1 = s1.find("input", {"id": "__VIEWSTATEGENERATOR"})
+        if not vs1 or not ev1:
+            return None, None, "10EF2921"
+
+        # Step 2: AutoPostBack to select the region and populate the branch dropdown
+        payload = {
+            "__EVENTTARGET": "ddl_reg",
+            "__EVENTARGUMENT": "",
+            "__LASTFOCUS": "",
+            "__VIEWSTATE": vs1["value"],
+            "__VIEWSTATEGENERATOR": gen1.get("value", "10EF2921") if gen1 else "10EF2921",
+            "__SCROLLPOSITIONX": "0",
+            "__SCROLLPOSITIONY": "0",
+            "__EVENTVALIDATION": ev1["value"],
+            "ddl_reg": str(region_id),
+            "ddlPou": "Select",
+            "ddl_course": "Select"
+        }
+        post_headers = dict(HEADERS)
+        post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        r2 = session.post(URL, data=payload, headers=post_headers, timeout=20)
+        if r2.status_code == 200:
+            s2 = BeautifulSoup(r2.text, "html.parser")
+            vs2 = s2.find("input", {"id": "__VIEWSTATE"})
+            ev2 = s2.find("input", {"id": "__EVENTVALIDATION"})
+            gen2 = s2.find("input", {"id": "__VIEWSTATEGENERATOR"})
+            if vs2 and ev2:
+                print(f"Successfully obtained live session tokens for Region {region_id}!")
+                return vs2["value"], ev2["value"], gen2.get("value", "10EF2921") if gen2 else "10EF2921"
+        else:
+            print(f"Region postback failed: HTTP {r2.status_code}")
+    except Exception as e:
+        print(f"Dynamic token handshake failed: {e}")
+
+    return None, None, "10EF2921"
 
 def get_or_create_topic(group_id, tier, topic_name, topics_map, force_refresh=False):
     tier_key = tier.upper()
@@ -279,36 +331,26 @@ def main():
     newly_seen = set()
     session = requests.Session()
 
-    print("Fetching live session tokens from portal...")
-    try:
-        res = session.get(URL, headers=HEADERS, timeout=20)
-        soup = BeautifulSoup(res.text, "html.parser")
-        vs_tag = soup.find("input", {"id": "__VIEWSTATE"})
-        ev_tag = soup.find("input", {"id": "__EVENTVALIDATION"})
-        gen_tag = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
-
-        live_vs = vs_tag.get("value", "") if vs_tag else ""
-        live_ev = ev_tag.get("value", "") if ev_tag else ""
-        live_gen = gen_tag.get("value", "10EF2921") if gen_tag else "10EF2921"
-    except Exception as e:
-        print(f"Initial GET failed: {e}. Falling back to pre-signed tokens.")
-        live_vs, live_ev, live_gen = "", "", "10EF2921"
+    live_vs, live_ev, live_gen = fetch_region_tokens(session, REGION_ID)
+    if not live_vs or not live_ev:
+        print("Falling back to pre-signed tokens for EIRC.")
+        live_vs, live_ev, live_gen = FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
 
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning EIRC [{course['tier']}]: {course['name']} ================")
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                table = None
-                if live_vs and live_ev:
-                    res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
-                    if res.status_code == 200:
-                        table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
-
-                if not table:
+                res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
+                
+                # If dynamic token failed on a branch, try fallback tokens
+                if res.status_code != 200 and live_vs != FALLBACK_VIEWSTATE:
                     res = query_portal(session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921")
-                    if res.status_code == 200:
-                        table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
 
+                if res.status_code != 200:
+                    print(f"[{course['name']}] {branch_name.ljust(15)} -> SERVER HTTP {res.status_code}")
+                    continue
+
+                table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
                 if not table:
                     continue
 
