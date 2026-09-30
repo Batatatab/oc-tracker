@@ -1,16 +1,4 @@
 {
-  "INTER": {
-    "\ud83c\udfe2 Delhi": 258,
-    "\ud83c\udfdb\ufe0f Chandigarh": 276,
-    "\ud83c\udfd9\ufe0f Gurugram": 279,
-    "\ud83c\udfed Faridabad": 282,
-    "\ud83d\udccd Other NIRC Branches": 285
-  },
-  "FINAL": {
-    "\ud83c\udfe2 Delhi": 119,
-    "\ud83c\udfdb\ufe0f Chandigarh": 129,
-    "\ud83c\udfd9\ufe0f Gurugram": 131,
-    "\ud83c\udfed Faridabad": 135,
-    "\ud83d\udccd Other NIRC Branches": 137
-  }
+  "INTER": {},
+  "FINAL": {}
 }
