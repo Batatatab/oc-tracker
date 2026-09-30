@@ -17,6 +17,7 @@ GROUP_FINAL_ID = -1004224921246
 # High-density focus branches in Eastern Region
 HIGH_DENSITY_BRANCHES = {
     "KOLKATA": "🏢 Kolkata",
+    "KOLKATA_HQ": "🏢 Kolkata",
     "BHUBANESWAR": "🏛️ Bhubaneswar",
     "GUWAHATI": "🌿 Guwahati",
     "SILIGURI": "🏔️ Siliguri",
@@ -39,6 +40,24 @@ COURSES_TO_CHECK = [
 
 REGION_ID = "1"  # Eastern Region
 
+# Known Eastern Region Branch Mappings
+BRANCHES_TO_CHECK = {
+    "KOLKATA": "1",
+    "BHUBANESWAR": "2",
+    "CUTTACK": "3",
+    "GUWAHATI": "4",
+    "ROURKELA": "5",
+    "SILIGURI": "6",
+    "ASANSOL": "7",
+    "SAMBALPUR": "8",
+    "RANIGANJ": "9",
+    "BRAHMAPUR": "10",
+    "DIBRUGARH": "11",
+    "TINSUKIA": "12",
+    "SILCHAR": "13",
+    "KOLKATA_HQ": "255"
+}
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -58,19 +77,6 @@ def load_json(filepath, default):
 def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
-
-def extract_form_payload(soup):
-    payload = {}
-    for inp in soup.find_all("input"):
-        name = inp.get("name")
-        if name:
-            payload[name] = inp.get("value", "")
-    for sel in soup.find_all("select"):
-        name = sel.get("name")
-        if name:
-            opt = sel.find("option", selected=True) or sel.find("option")
-            payload[name] = opt.get("value", "") if opt else ""
-    return payload
 
 def get_or_create_topic(group_id, tier, topic_name, topics_map):
     tier_key = tier.upper()
@@ -179,33 +185,62 @@ def parse_batches(table):
                 results.append(batch_data)
     return results
 
-def fetch_live_eirc_environment(session):
-    print("Initiating portal handshake for EIRC...")
+def get_session_tokens(session):
+    print("Fetching initial session tokens from portal...")
     res = session.get(URL, headers=HEADERS, timeout=20)
-    initial_soup = BeautifulSoup(res.text, "html.parser")
-    
-    # Extract clean form state and postback for Eastern Region (1)
-    payload = extract_form_payload(initial_soup)
-    payload["__EVENTTARGET"] = "ddl_reg"
-    payload["__EVENTARGUMENT"] = ""
-    payload["ddl_reg"] = REGION_ID
-    payload.pop("btn_getlist", None)
+    soup = BeautifulSoup(res.text, "html.parser")
 
-    post_res = session.post(URL, data=payload, headers=HEADERS, timeout=20)
-    post_soup = BeautifulSoup(post_res.text, "html.parser")
-    
-    branches = {}
-    pou_select = post_soup.find("select", {"id": "ddlPou"})
-    if pou_select:
-        for opt in pou_select.find_all("option"):
-            val = opt.get("value", "").strip()
-            name = opt.text.strip()
-            if val and val.lower() != "select":
-                clean_name = re.sub(r'[^a-zA-Z\s]', '', name).strip().upper()
-                branches[clean_name] = val
+    vs = soup.find("input", {"id": "__VIEWSTATE"})
+    ev = soup.find("input", {"id": "__EVENTVALIDATION"})
+    gen = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})
 
-    print(f"Discovered {len(branches)} live branches for Eastern Region: {list(branches.keys())}")
-    return branches, post_soup
+    live_vs = vs.get("value", "") if vs else ""
+    live_ev = ev.get("value", "") if ev else ""
+    live_gen = gen.get("value", "10EF2921") if gen else "10EF2921"
+
+    # Attempt server handshake for Region 1 to capture region-level EventValidation
+    try:
+        postback_payload = {
+            "__EVENTTARGET": "ddl_reg",
+            "__EVENTARGUMENT": "",
+            "__LASTFOCUS": "",
+            "__VIEWSTATE": live_vs,
+            "__VIEWSTATEGENERATOR": live_gen,
+            "__SCROLLPOSITIONX": "0",
+            "__SCROLLPOSITIONY": "0",
+            "__EVENTVALIDATION": live_ev,
+            "ddl_reg": REGION_ID,
+            "ddlPou": "Select",
+            "ddl_course": "Select"
+        }
+        r = session.post(URL, data=postback_payload, headers=HEADERS, timeout=15)
+        p_soup = BeautifulSoup(r.text, "html.parser")
+        p_vs = p_soup.find("input", {"id": "__VIEWSTATE"})
+        p_ev = p_soup.find("input", {"id": "__EVENTVALIDATION"})
+        if p_vs and p_ev:
+            print("Captured EIRC region postback tokens.")
+            return p_vs.get("value", live_vs), p_ev.get("value", live_ev), live_gen
+    except Exception as e:
+        print(f"Postback handshake skipped ({e}), falling back to direct tokens.")
+
+    return live_vs, live_ev, live_gen
+
+def query_portal(session, course_id, branch_code, viewstate, eventval, viewstategen):
+    payload = {
+        "__EVENTTARGET": "",
+        "__EVENTARGUMENT": "",
+        "__LASTFOCUS": "",
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstategen,
+        "__SCROLLPOSITIONX": "0",
+        "__SCROLLPOSITIONY": "0",
+        "__EVENTVALIDATION": eventval,
+        "ddl_reg": REGION_ID,
+        "ddlPou": branch_code,
+        "ddl_course": course_id,
+        "btn_getlist": "Get List"
+    }
+    return session.post(URL, data=payload, headers=HEADERS, timeout=20)
 
 def main():
     seen_batches = set(load_json(SEEN_DATA_FILE, []))
@@ -214,31 +249,17 @@ def main():
     session = requests.Session()
 
     try:
-        branches_to_check, post_soup = fetch_live_eirc_environment(session)
+        vs, ev, gen = get_session_tokens(session)
     except Exception as e:
-        print(f"Failed to fetch EIRC environment: {e}")
-        return
-
-    if not branches_to_check:
-        print("Error: Could not retrieve branches for Eastern Region.")
+        print(f"Initial get request failed: {e}")
         return
 
     for course in COURSES_TO_CHECK:
         print(f"\n================ Scanning EIRC [{course['tier']}]: {course['name']} ================")
-        for branch_name, branch_code in branches_to_check.items():
+        for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
-                # Prepare query using postback soup state
-                payload = extract_form_payload(post_soup)
-                payload["__EVENTTARGET"] = ""
-                payload["__EVENTARGUMENT"] = ""
-                payload["ddl_reg"] = REGION_ID
-                payload["ddlPou"] = branch_code
-                payload["ddl_course"] = course["id"]
-                payload["btn_getlist"] = "Get List"
-
-                res = session.post(URL, data=payload, headers=HEADERS, timeout=20)
+                res = query_portal(session, course["id"], branch_code, vs, ev, gen)
                 table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
-                
                 if not table:
                     continue
 
