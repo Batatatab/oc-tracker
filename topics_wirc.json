@@ -1,4 +1,29 @@
 {
-  "INTER": {},
-  "FINAL": {}
+  "INTER": {
+    "\ud83c\udfe2 Mumbai": 272,
+    "\ud83c\udfdb\ufe0f Pune": 279,
+    "\ud83c\udfd9\ufe0f Ahmedabad": 284,
+    "\ud83c\udf06 Thane": 287,
+    "\ud83c\udf09 Navi Mumbai": 293,
+    "\ud83c\udfd7\ufe0f Pimpri Chinchwad": 295,
+    "\ud83c\udf47 Nashik": 299,
+    "\ud83d\udc8e Surat": 302,
+    "\ud83c\udfed Vadodara": 307,
+    "\ud83d\udccd Other WIRC Branches": 311,
+    "\ud83c\udf4c Jalgaon": 313,
+    "\ud83c\udf34 Goa": 318
+  },
+  "FINAL": {
+    "\ud83c\udfe2 Mumbai": 165,
+    "\ud83c\udfdb\ufe0f Pune": 170,
+    "\ud83c\udfd9\ufe0f Ahmedabad": 175,
+    "\ud83c\udf06 Thane": 179,
+    "\ud83c\udf09 Navi Mumbai": 184,
+    "\ud83c\udfd7\ufe0f Pimpri Chinchwad": 188,
+    "\ud83c\udf47 Nashik": 191,
+    "\ud83d\udc8e Surat": 194,
+    "\ud83c\udfed Vadodara": 197,
+    "\ud83d\udccd Other WIRC Branches": 200,
+    "\ud83c\udf4c Jalgaon": 254
+  }
 }

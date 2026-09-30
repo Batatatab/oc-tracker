@@ -1,4 +1,19 @@
 {
-  "INTER": {},
-  "FINAL": {}
+  "INTER": {
+    "\ud83c\udfe2 Kolkata": 63,
+    "\ud83c\udfdb\ufe0f Bhubaneswar": 70,
+    "\ud83c\udf3f Guwahati": 72,
+    "\ud83c\udfd4\ufe0f Siliguri": 74,
+    "\ud83d\ude82 Asansol": 76,
+    "\ud83c\udfed Durgapur": 78,
+    "\ud83c\udff0 Cuttack": 86
+  },
+  "FINAL": {
+    "\ud83c\udfe2 Kolkata": 53,
+    "\ud83c\udfdb\ufe0f Bhubaneswar": 68,
+    "\ud83c\udfd4\ufe0f Siliguri": 71,
+    "\ud83d\ude82 Asansol": 74,
+    "\ud83c\udfed Durgapur": 77,
+    "\ud83d\udccd Other EIRC Branches": 83
+  }
 }
