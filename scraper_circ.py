@@ -11,11 +11,10 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 SEEN_DATA_FILE = "seen_batches_circ.json"
 TOPICS_FILE = "topics_circ.json"
 
-# Telegram Supergroup Chat IDs for CIRC
-GROUP_INTER_ID = -1004499260705  # Replace with CIRC Inter Group ID
+# Telegram Supergroup Chat IDs for CIRC (Verify these match your group IDs)
+GROUP_INTER_ID = -1004499260705 # Replace with CIRC Inter Group ID
 GROUP_FINAL_ID = -1003935561138  # Replace with CIRC Final Group ID
 
-# Strictly these 8 cities get dedicated topics
 HIGH_DENSITY_BRANCHES = {
     "JAIPUR": "🏰 Jaipur",
     "INDORE": "🌟 Indore",
@@ -123,12 +122,12 @@ def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def get_or_create_topic(group_id, tier, topic_name, topics_map):
+def get_or_create_topic(group_id, tier, topic_name, topics_map, force_refresh=False):
     tier_key = tier.upper()
     if tier_key not in topics_map:
         topics_map[tier_key] = {}
 
-    if topic_name in topics_map[tier_key]:
+    if not force_refresh and topic_name in topics_map[tier_key]:
         return topics_map[tier_key][topic_name]
 
     if not BOT_TOKEN or not group_id or group_id == -1000000000000:
@@ -144,7 +143,7 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
             thread_id = data["result"]["message_thread_id"]
             topics_map[tier_key][topic_name] = thread_id
             save_json(TOPICS_FILE, topics_map)
-            print(f"[{tier}] Created topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
+            print(f"[{tier}] Successfully created/restored topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
             time.sleep(1.0)
             return thread_id
         else:
@@ -154,9 +153,11 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
         print(f"Error creating topic '{topic_name}': {e}")
         return None
 
-def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
+def send_telegram_alert(batch, course, group_id, tier, topic_title, topics_map, max_retries=3):
     if not BOT_TOKEN or not group_id or group_id == -1000000000000:
         return False
+
+    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map)
 
     text = (
         f"{course['icon']} <b>[CIRC] New ICAI {html.escape(course['name'])} Batch!</b>\n\n"
@@ -192,7 +193,22 @@ def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
                 continue
 
             if not res.ok:
-                print(f"Telegram API Error ({res.status_code}): {res.text}")
+                err_data = res.json()
+                desc = err_data.get("description", "")
+                print(f"Telegram API Error ({res.status_code}): {desc}")
+
+                # Self-healing: if thread was deleted, recreate and retry immediately
+                if "message thread not found" in desc:
+                    print(f"Rebuilding deleted topic '{topic_title}' and recovering message thread...")
+                    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map, force_refresh=True)
+                    if thread_id:
+                        payload["message_thread_id"] = thread_id
+                        res = requests.post(api_url, json=payload, timeout=10)
+                        if res.ok:
+                            print(f"[{course['name']}] Recovered alert for {batch['batch_no']} -> Topic: {thread_id}")
+                            time.sleep(1.5)
+                            return True
+
                 res.raise_for_status()
 
             print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> Group {group_id} (Topic: {thread_id})")
@@ -270,7 +286,6 @@ def main():
                     continue
 
                 batches = parse_batches(table)
-                # Filter for batches not yet alerted
                 unseen_batches = [b for b in batches if b["batch_no"] not in seen_batches]
 
                 if not unseen_batches:
@@ -278,13 +293,11 @@ def main():
 
                 print(f"[{course['name']}] {branch_name.ljust(20)} -> {len(unseen_batches)} NEW BATCHES TO ALERT")
 
-                # Resolve topic only when new batches exist
                 clean_name = branch_name.strip().upper()
                 topic_title = HIGH_DENSITY_BRANCHES.get(clean_name, CATCH_ALL_TOPIC_NAME)
-                thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
 
                 for b in unseen_batches:
-                    if send_telegram_alert(b, course, course["group_id"], thread_id):
+                    if send_telegram_alert(b, course, course["group_id"], course["tier"], topic_title, topics_map):
                         seen_batches.add(b["batch_no"])
                         newly_seen.add(b["batch_no"])
 
@@ -293,9 +306,9 @@ def main():
 
     if newly_seen:
         save_json(SEEN_DATA_FILE, sorted(list(seen_batches)))
-        print(f"\n[CIRC] Run complete: recorded and alerted {len(newly_seen)} new batches.")
+        print(f"\n[CIRC] Run complete: successfully alerted and recorded {len(newly_seen)} batches.")
     else:
-        print("\n[CIRC] Run complete: scan finished cleanly (all batches already alerted).")
+        print("\n[CIRC] Run complete: scan finished cleanly.")
 
 if __name__ == "__main__":
     main()
