@@ -1,29 +1,4 @@
 {
-  "INTER": {
-    "\ud83c\udfdb\ufe0f Chennai": 215,
-    "\ud83d\udcbb Bengaluru": 218,
-    "\ud83c\udfd9\ufe0f Hyderabad": 223,
-    "\ud83c\udfed Coimbatore": 228,
-    "\ud83d\udea2 Ernakulam (Kochi)": 231,
-    "\ud83c\udf0a Visakhapatnam": 234,
-    "\ud83c\udf3e Vijayawada": 236,
-    "\ud83c\udf34 Thiruvananthapuram": 239,
-    "\u2615 Kozhikode": 241,
-    "\ud83d\ude4f Tirupati": 245,
-    "\ud83d\udccd Other SIRC Branches": 247,
-    "\ud83d\uded5 Madurai": 280
-  },
-  "FINAL": {
-    "\ud83d\udcbb Bengaluru": 121,
-    "\ud83c\udfd9\ufe0f Hyderabad": 130,
-    "\ud83c\udfed Coimbatore": 136,
-    "\ud83d\udea2 Ernakulam (Kochi)": 138,
-    "\ud83c\udf0a Visakhapatnam": 142,
-    "\ud83c\udf3e Vijayawada": 145,
-    "\ud83c\udf34 Thiruvananthapuram": 148,
-    "\u2615 Kozhikode": 152,
-    "\ud83d\ude4f Tirupati": 156,
-    "\ud83d\udccd Other SIRC Branches": 158,
-    "\ud83c\udff0 Mysuru": 207
-  }
+  "INTER": {},
+  "FINAL": {}
 }
