@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+import html
 import requests
 from bs4 import BeautifulSoup
 
@@ -125,12 +126,12 @@ def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def get_or_create_topic(group_id, tier, topic_name, topics_map):
+def get_or_create_topic(group_id, tier, topic_name, topics_map, force_refresh=False):
     tier_key = tier.upper()
     if tier_key not in topics_map:
         topics_map[tier_key] = {}
 
-    if topic_name in topics_map[tier_key]:
+    if not force_refresh and topic_name in topics_map[tier_key]:
         return topics_map[tier_key][topic_name]
 
     if not BOT_TOKEN or not group_id:
@@ -149,7 +150,7 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
             thread_id = data["result"]["message_thread_id"]
             topics_map[tier_key][topic_name] = thread_id
             save_json(TOPICS_FILE, topics_map)
-            print(f"[{tier}] Created topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
+            print(f"[{tier}] Created/restored topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
             time.sleep(1.0)
             return thread_id
         else:
@@ -159,18 +160,20 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
         print(f"Error creating topic '{topic_name}': {e}")
         return None
 
-def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
+def send_telegram_alert(batch, course, group_id, tier, topic_title, topics_map, max_retries=3):
     if not BOT_TOKEN or not group_id:
         return False
 
+    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map)
+
     text = (
-        f"{course['icon']} <b>[EIRC] New ICAI {course['name']} Batch!</b>\n\n"
-        f"📍 <b>Centre:</b> {batch['pou']}\n"
-        f"🆔 <b>Batch Code:</b> <code>{batch['batch_no']}</code>\n"
-        f"📅 <b>Dates:</b> {batch['from_date']} to {batch['to_date']}\n"
-        f"⏰ <b>Timings:</b> {batch['timings']}\n"
-        f"💺 <b>Available Seats:</b> {batch['seats']}\n"
-        f"📌 <b>Status:</b> {batch['status']}\n\n"
+        f"{course['icon']} <b>[EIRC] New ICAI {html.escape(course['name'])} Batch!</b>\n\n"
+        f"📍 <b>Centre:</b> {html.escape(batch['pou'])}\n"
+        f"🆔 <b>Batch Code:</b> <code>{html.escape(batch['batch_no'])}</code>\n"
+        f"📅 <b>Dates:</b> {html.escape(batch['from_date'])} to {html.escape(batch['to_date'])}\n"
+        f"⏰ <b>Timings:</b> {html.escape(batch['timings'])}\n"
+        f"💺 <b>Available Seats:</b> {html.escape(str(batch['seats']))}\n"
+        f"📌 <b>Status:</b> {html.escape(batch['status'])}\n\n"
         f"🔗 <a href='{URL}'>Register on ICAI Portal</a>"
     )
 
@@ -193,12 +196,31 @@ def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
                     wait_time = res.json().get("parameters", {}).get("retry_after", 5)
                 except Exception:
                     pass
+                print(f"[Rate Limit] Pausing {wait_time + 1}s before retry...")
                 time.sleep(wait_time + 1)
                 continue
 
-            res.raise_for_status()
+            if not res.ok:
+                err_data = res.json()
+                desc = err_data.get("description", "")
+                print(f"Telegram API Error ({res.status_code}): {desc}")
+
+                # Self-healing: if topic was deleted from Telegram, recreate on the fly
+                if "message thread not found" in desc:
+                    print(f"Rebuilding deleted topic '{topic_title}' and retrying delivery...")
+                    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map, force_refresh=True)
+                    if thread_id:
+                        payload["message_thread_id"] = thread_id
+                        res = requests.post(api_url, json=payload, timeout=10)
+                        if res.ok:
+                            print(f"[{course['name']}] Recovered alert for {batch['batch_no']} -> Topic: {thread_id}")
+                            time.sleep(1.5)
+                            return True
+
+                res.raise_for_status()
+
             print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> Group {group_id} (Topic: {thread_id})")
-            time.sleep(2.0)
+            time.sleep(1.5)
             return True
         except Exception as e:
             print(f"Attempt {attempt + 1} failed for {batch['batch_no']}: {e}")
@@ -277,38 +299,41 @@ def main():
         for branch_name, branch_code in BRANCHES_TO_CHECK.items():
             try:
                 table = None
-                # Primary attempt: try with live tokens if available
                 if live_vs and live_ev:
                     res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
-                    table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
+                    if res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
 
-                # Fallback attempt: use verified Eastern Region tokens
                 if not table:
                     res = query_portal(session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921")
-                    table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
+                    if res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(res.text, "html.parser"))
 
                 if not table:
-                    print(f"[{course['name']}] {branch_name.ljust(15)} -> 0 active batches")
                     continue
 
                 batches = parse_batches(table)
-                print(f"[{course['name']}] {branch_name.ljust(15)} -> FOUND {len(batches)} BATCHES")
+                unseen_batches = [b for b in batches if b["batch_no"] not in seen_batches]
 
-                topic_title = HIGH_DENSITY_BRANCHES.get(branch_name, CATCH_ALL_TOPIC_NAME)
-                thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
+                if not unseen_batches:
+                    continue
 
-                for b in batches:
-                    if b["batch_no"] not in seen_batches:
-                        if send_telegram_alert(b, course, course["group_id"], thread_id):
-                            seen_batches.add(b["batch_no"])
-                            newly_seen.add(b["batch_no"])
+                print(f"[{course['name']}] {branch_name.ljust(15)} -> {len(unseen_batches)} NEW BATCHES TO ALERT")
+
+                clean_name = branch_name.strip().upper()
+                topic_title = HIGH_DENSITY_BRANCHES.get(clean_name, CATCH_ALL_TOPIC_NAME)
+
+                for b in unseen_batches:
+                    if send_telegram_alert(b, course, course["group_id"], course["tier"], topic_title, topics_map):
+                        seen_batches.add(b["batch_no"])
+                        newly_seen.add(b["batch_no"])
 
             except Exception as e:
                 print(f"Error querying {course['name']} @ {branch_name}: {e}")
 
     if newly_seen:
         save_json(SEEN_DATA_FILE, sorted(list(seen_batches)))
-        print(f"\n[EIRC] Run complete: recorded {len(newly_seen)} new batches.")
+        print(f"\n[EIRC] Run complete: recorded and alerted {len(newly_seen)} new batches.")
     else:
         print("\n[EIRC] Run complete: scan finished cleanly (no new batches).")
 
