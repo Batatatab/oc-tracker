@@ -10,30 +10,19 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 SEEN_DATA_FILE = "seen_batches_circ.json"
 TOPICS_FILE = "topics_circ.json"
 
-# Telegram Supergroup Chat IDs for CIRC (Replace with your CIRC group IDs)
-GROUP_INTER_ID = -1003935561138  # Replace with CIRC Inter Group ID
-GROUP_FINAL_ID = -1004499260705  # Replace with CIRC Final Group ID
+# Telegram Supergroup Chat IDs for CIRC (Keep your configured IDs)
+GROUP_INTER_ID = -1003935561138  # Replace with your CIRC Inter Group ID
+GROUP_FINAL_ID = -1004499260705  # Replace with your CIRC Final Group ID
 
-# Dedicated high-density topics for major Central Region hubs
+# Strictly these 8 cities get dedicated topics
 HIGH_DENSITY_BRANCHES = {
     "JAIPUR": "🏰 Jaipur",
-    "KANPUR": "🏭 Kanpur",
-    "LUCKNOW": "🏛️ Lucknow",
     "INDORE": "🌟 Indore",
-    "BHOPAL": "🌊 Bhopal",
-    "PATNA": "📜 Patna",
-    "RAIPUR": "🌾 Raipur",
-    "VARANASI": "🕉️ Varanasi",
-    "AGRA": "🕌 Agra",
-    "PRAYAGRAJ": "🌊 Prayagraj",
-    "DEHRADUN": "⛰️ Dehradun",
-    "JODHPUR": "☀️ Jodhpur",
-    "RANCHI": "🌳 Ranchi",
     "GHAZIABAD": "🏢 Ghaziabad",
-    "KOTA": "📚 Kota",
-    "UDAIPUR": "🏰 Udaipur",
-    "JAMSHEDPUR": "⚙️ Jamshedpur",
-    "GWALIOR": "🏰 Gwalior",
+    "BHOPAL": "🌊 Bhopal",
+    "AGRA": "🕌 Agra",
+    "AJMER": "🕌 Ajmer",
+    "PATNA": "📜 Patna",
     "MEERUT": "🏙️ Meerut"
 }
 CATCH_ALL_TOPIC_NAME = "📍 Other CIRC Branches"
@@ -51,7 +40,7 @@ COURSES_TO_CHECK = [
 
 REGION_ID = "5"  # Central Region
 
-# All 55 verified Central branches
+# All 55 Central branches are monitored
 BRANCHES_TO_CHECK = {
     "AGRA": "150",
     "AJMER": "151",
@@ -110,10 +99,8 @@ BRANCHES_TO_CHECK = {
     "VARANASI": "192"
 }
 
-# Bit-for-bit raw Central Region ViewState
 CIRC_VIEWSTATE = """/wEPDwUKMTY4OTkwNTY0MA9kFgICBA9kFgoCAw8WAh4HVmlzaWJsZWdkAgcPEA8WBh4NRGF0YVRleHRGaWVsZAULcmVnaW9uX25hbWUeDkRhdGFWYWx1ZUZpZWxkBQlyZWdpb25faWQeC18hRGF0YUJvdW5kZ2QQFQcGU2VsZWN0B0NlbnRyYWwHRWFzdGVybgdGb3JlaWduCE5vcnRoZXJuCFNvdXRoZXJuB1dlc3Rlcm4VBwZTZWxlY3QBNQExATYBMwE0ATIUKwMHZ2dnZ2dnZxYBAgFkAgsPEA8WBh8BBQticmFuY2hfbmFtZR8CBQlicmFuY2hfaWQfA2dkEBU3BEFHUkEFQUpNRVIHQUxJR0FSSAVBTFdBUghCQVJFSUxMWQZCRUFXQVIJQmhhZ2FscHVyCUJoYXJhdHB1cgZCSElMQUkIQkhJTFdBUkEGQkhPUEFMB0JJS0FORVIIQklMQVNQVVILQnVsYW5kc2hhaHILQ0hJVFRPUkdBUkgEQ0lSQwhERUhSQURVTgdESEFOQkFEEEdhdXRhbUJ1ZGhhTmFnYXIJR0hBWklBQkFECUdPUkFLSFBVUgdHV0FMSU9SCEhhbGR3YW5pC0hhbnVtYW5nYXJoCEhBUklEV0FSBklORE9SRQhKQUJBTFBVUgZKQUlQVVIKSkFNU0hFRFBVUgZKSEFOU0kHSk9ESFBVUgZLQU5QVVIKS0lTSEFOR0FSSARLT1RBB0xVQ0tOT1cHTUFUSFVSQQZNRUVSVVQJTU9SQURBQkFEDU1VWkFGRkFSTkFHQVIHTmVlbXVjaARQQUxJBVBBVE5BCVBSQVlBR1JBSgdSYWlnYXJoBlJBSVBVUglSYWpzYW1hbmQGUkFOQ0hJBlJBVExBTQpTQUhBUkFOUFVSBVNBVE5BBVNJS0FSDVNSSUdBTkdBTkFHQVIHVURBSVBVUgZVSkpBSU4IVkFSQU5BU0kVNwMxNTADMTUxAzE1MgMxNTQDMTU1AzE1NgMyODADMjY0AzE1NwMxNTgDMTU5AzE2MAMxNjEDMjcwAzE2MgMyNDcDMTYzAzE2NAMxODEDMTY1AzE2NgMxNjcDMjYyAzI4NAMyNDMDMTY4AzE2OQMxNzADMTcxAzE3MgMxNzMDMjQwAzE3NAMxNzUDMTc2AzE3NwMxNzgDMTc5AzE4MAMyODMDMTgyAzE4MwMxNTMDMjg4AzE4NAMyODYDMTg1AzE4NgMxODcDMjQxAzE4OAMxODkDMTkwAzE5MQMxOTIUKwM3Z2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2RkAg8PEA8WBh8BBQtjb3Vyc2VfbmFtZR8CBQljb3Vyc2VfaWQfA2dkEBUFHEFkdmFuY2VkIChJQ0lUU1MpIE1DUyBDb3Vyc2UmQWR2YW5jZWQgKElDSVRTUykgTUNTIENvdXJzZSAtIFdlZWtlbmQpQUlDSVRTUyAtIEFkdmFuY2VkIEluZm9ybWF0aW9uIFRlY2hub2xvZ3kfSUNJVFNTIC0gSW5mb3JtYXRpb24gVGVjaG5vbG9neRtJQ0lUU1MgLSBPcmllbnRhdGlvbiBDb3Vyc2UVBQI0NQI0OQI0OAI0NwI0NhQrAwVnZ2dnZ2RkAhMPZBYCZg9kFgICAQ88KwARAgEQFgAWABYADBQrAABkGAEFCUdyaWRWaWV3MQ9nZFpQAkqnXnWZ13wdbG/nIZ+EPukTVzCt1m7+/Y84baW/""".strip()
 
-# Bit-for-bit raw Central Region EventValidation
 CIRC_EVENTVALIDATION = """/wEdAEahT2x411WE+qKyQqm6MZXqBlQi3z98kEUtu3eeY4Trat6exFmXkPdVcrOOeGjItwuyPnxUY8XnCNICH5i1DkmDXFPgpuH3lEReDvg4F/RmT2b5xc52gpE9Izq5nWPtrGRQp2m7IlhPwdDibvoytWRumG9yZyRhUfRE4W6sWNNHnbU7cbYesaWJWhXAU382C3n6egKoRaBQkLESZcuYTH8FBTy4HgdqeVGYUsH7q/5GqPmMCVaP0ZyOC1X/SlWllkNrYUCHyEH2clVc8JunqT+Fa3oQG+TzRLk34zRKdw8Mg/r6bU6N8W4e15HSzCdISFpMKhlwDD+Ha7TZS2moIQ5Ph11/wPqciHwwwb3i4Tu1rHPkeixJWNBn6j4YuamNpdeWMbu1BooDoHuJJBLS1ENJzcdTwrZUejztp28fTGkI3Am6E1jNXL0/jhg5t/6z2+KUybmITfpVa0yglltNN2OO2E29HP5fCpqGcvbPWrjbI/hWnAA1oQNXU11pXjbZ1E9sKxuvX45Y95cQ0Mxi7KnHwHz/HcXdqh7e4gR3x/runbrEb2SapeFpYgz79WZCGKg2zhRX0ECbpG51anMPltUJxNzN9Ctda21xC0rw0sk7ju3LdMEG+jBy10KIaOqdj96DfcovoqHuD6XhI0HyQ2wfX308p1R58pkQR7tgyHTNGGCq7ZtC/MrctPU2TnYOKpTjzIZRpSbhJOkUsUE39iyz4QVy7s5DTxRR1xAzIda16X/67/F6GAd/gQ2aA/zkUYSrVscY+DQPmfQXrdxmS7wDZW5F2MOBEnw/amQtsj4clV9qxMR6fIHP7aCFEcHVrNEFZV7xWtM2WgSAs2POepyWhDAsYkq9wy277Bv58KL+LuraXJ2Uhsk0C9NkW7N76pJmbSXZAxMUauKwcFDJruQ24wegyTh3RZ1+dl3fU2QNEM18crEz4bgYwbO4ivUlKFE6zrU5ah7ysbAs2iDVmL5P6gyr66e2cQbrHfy6nSrZ8FPezTL6I1lTEOUfbmFGMLEx5Fhyg4Q2InBKjnWWtwzP4rDfD/m1vJixE660VHsdjYSvE9epg49etY5L+UdMEawjZyCc0n+rfFNrGgxYNOniwfSaEDwdJQNCJIfO62TjbzwCCqaXRqclAOq1Q0DeDhaLBrFYu0vI7+LM+9iEE4qfG/GFlDZqisUL4VJjQ3Rr0Q0z6V6ohkaA4+jrUoXdGWGqMNSyKaQO5kK8F9N1rzl0CB5qaRvExS0NfQuWBLNo6ezTkfLD1s4EcY5VwI5S8gA+ja+ZQCVUd2D40xjTt2yAKb2FrmP0zyD2/zOrWcMGqxqfZsN4UKhh8Hqlv9wcMm8DHR8KpOmb0fJKm5AzVN5vjf8YiB1XjM6pDMuBsCTksdHFGytE3wsbRLKHkgIO13lh3O53Kq0YPhYi6QZHGwzvMK3g4rShulMefcB1wQqYWHz3U7YsH2RtOFG+6Tvql1KdnVWfgMcWjSBU4u/dFKLtJn8mteDFBdQiiT3TCXVMUd/1gSFnmS5WupvdimtcCT0=""".strip()
 
 HEADERS = {
@@ -283,7 +270,9 @@ def main():
                 batches = parse_batches(table)
                 print(f"[{course['name']}] {branch_name.ljust(20)} -> FOUND {len(batches)} BATCHES")
 
-                topic_title = HIGH_DENSITY_BRANCHES.get(branch_name.upper(), CATCH_ALL_TOPIC_NAME)
+                # Strictly match against the 8 allowed cities or fall back
+                clean_name = branch_name.strip().upper()
+                topic_title = HIGH_DENSITY_BRANCHES.get(clean_name, CATCH_ALL_TOPIC_NAME)
                 thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
 
                 for b in batches:
