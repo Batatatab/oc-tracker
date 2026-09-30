@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+import html
 import urllib.parse
 import requests
 from bs4 import BeautifulSoup
@@ -12,7 +13,6 @@ SEEN_DATA_FILE = "seen_batches_nirc.json"
 TOPICS_FILE = "topics_nirc.json"
 
 # Telegram Supergroup Chat IDs
-# Use your dedicated NIRC group IDs, or your shared Inter/Final IDs:
 GROUP_INTER_ID = -1004425118828
 GROUP_FINAL_ID = -1003702612974
 
@@ -93,15 +93,15 @@ def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def get_or_create_topic(group_id, tier, topic_name, topics_map):
+def get_or_create_topic(group_id, tier, topic_name, topics_map, force_refresh=False):
     tier_key = tier.upper()
     if tier_key not in topics_map:
         topics_map[tier_key] = {}
 
-    if topic_name in topics_map[tier_key]:
+    if not force_refresh and topic_name in topics_map[tier_key]:
         return topics_map[tier_key][topic_name]
 
-    if not BOT_TOKEN:
+    if not BOT_TOKEN or not group_id:
         return None
 
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createForumTopic"
@@ -117,7 +117,7 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
             thread_id = data["result"]["message_thread_id"]
             topics_map[tier_key][topic_name] = thread_id
             save_json(TOPICS_FILE, topics_map)
-            print(f"[{tier}] Created topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
+            print(f"[{tier}] Created/restored topic: '{topic_name}' in group {group_id} (ID: {thread_id})")
             time.sleep(1.0)
             return thread_id
         else:
@@ -127,19 +127,20 @@ def get_or_create_topic(group_id, tier, topic_name, topics_map):
         print(f"Error creating topic '{topic_name}': {e}")
         return None
 
-def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
-    if not BOT_TOKEN:
-        print("Error: TELEGRAM_BOT_TOKEN is not set.")
+def send_telegram_alert(batch, course, group_id, tier, topic_title, topics_map, max_retries=3):
+    if not BOT_TOKEN or not group_id:
         return False
 
+    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map)
+
     text = (
-        f"{course['icon']} <b>[NIRC] New ICAI {course['name']} Batch!</b>\n\n"
-        f"📍 <b>Centre:</b> {batch['pou']}\n"
-        f"🆔 <b>Batch Code:</b> <code>{batch['batch_no']}</code>\n"
-        f"📅 <b>Dates:</b> {batch['from_date']} to {batch['to_date']}\n"
-        f"⏰ <b>Timings:</b> {batch['timings']}\n"
-        f"💺 <b>Available Seats:</b> {batch['seats']}\n"
-        f"📌 <b>Status:</b> {batch['status']}\n\n"
+        f"{course['icon']} <b>[NIRC] New ICAI {html.escape(course['name'])} Batch!</b>\n\n"
+        f"📍 <b>Centre:</b> {html.escape(batch['pou'])}\n"
+        f"🆔 <b>Batch Code:</b> <code>{html.escape(batch['batch_no'])}</code>\n"
+        f"📅 <b>Dates:</b> {html.escape(batch['from_date'])} to {html.escape(batch['to_date'])}\n"
+        f"⏰ <b>Timings:</b> {html.escape(batch['timings'])}\n"
+        f"💺 <b>Available Seats:</b> {html.escape(str(batch['seats']))}\n"
+        f"📌 <b>Status:</b> {html.escape(batch['status'])}\n\n"
         f"🔗 <a href='{URL}'>Register on ICAI Portal</a>"
     )
 
@@ -166,9 +167,27 @@ def send_telegram_alert(batch, course, group_id, thread_id, max_retries=3):
                 time.sleep(wait_time + 1)
                 continue
 
-            res.raise_for_status()
+            if not res.ok:
+                err_data = res.json()
+                desc = err_data.get("description", "")
+                print(f"Telegram API Error ({res.status_code}): {desc}")
+
+                # Self-healing: recreate deleted topics on the fly
+                if "message thread not found" in desc:
+                    print(f"Rebuilding deleted topic '{topic_title}' and retrying delivery...")
+                    thread_id = get_or_create_topic(group_id, tier, topic_title, topics_map, force_refresh=True)
+                    if thread_id:
+                        payload["message_thread_id"] = thread_id
+                        res = requests.post(api_url, json=payload, timeout=10)
+                        if res.ok:
+                            print(f"[{course['name']}] Recovered alert for {batch['batch_no']} -> Topic: {thread_id}")
+                            time.sleep(1.5)
+                            return True
+
+                res.raise_for_status()
+
             print(f"[{course['name']}] Sent alert for {batch['batch_no']} -> Group {group_id} (Topic: {thread_id})")
-            time.sleep(2.0)
+            time.sleep(1.5)
             return True
         except Exception as e:
             print(f"Attempt {attempt + 1} failed for {batch['batch_no']}: {e}")
@@ -217,7 +236,9 @@ def query_portal(session, course_id, branch_code, viewstate, eventval, viewstate
         "ddl_course": course_id,
         "btn_getlist": "Get List"
     }
-    return session.post(URL, data=payload, headers=HEADERS, timeout=20)
+    post_headers = dict(HEADERS)
+    post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+    return session.post(URL, data=payload, headers=post_headers, timeout=20)
 
 def main():
     seen_batches = set(load_json(SEEN_DATA_FILE, []))
@@ -248,35 +269,41 @@ def main():
                 table = None
                 if live_vs and live_ev:
                     post_res = query_portal(session, course["id"], branch_code, live_vs, live_ev, live_gen)
-                    table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
+                    if post_res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
                 if not table:
                     post_res = query_portal(
                         session, course["id"], branch_code, FALLBACK_VIEWSTATE, FALLBACK_EVENTVALIDATION, "10EF2921"
                     )
-                    table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
+                    if post_res.status_code == 200:
+                        table = find_batch_table(BeautifulSoup(post_res.text, "html.parser"))
 
                 if not table:
                     continue
 
                 batches = parse_batches(table)
+                unseen_batches = [b for b in batches if b["batch_no"] not in seen_batches]
 
-                # Determine target forum topic
-                topic_title = HIGH_DENSITY_BRANCHES.get(branch_name, CATCH_ALL_TOPIC_NAME)
-                thread_id = get_or_create_topic(course["group_id"], course["tier"], topic_title, topics_map)
+                if not unseen_batches:
+                    continue
 
-                for b in batches:
-                    if b["batch_no"] not in seen_batches:
-                        if send_telegram_alert(b, course, course["group_id"], thread_id):
-                            seen_batches.add(b["batch_no"])
-                            newly_seen.add(b["batch_no"])
+                print(f"[{course['name']}] {branch_name.ljust(20)} -> {len(unseen_batches)} NEW BATCHES TO ALERT")
+
+                clean_name = branch_name.strip().upper()
+                topic_title = HIGH_DENSITY_BRANCHES.get(clean_name, CATCH_ALL_TOPIC_NAME)
+
+                for b in unseen_batches:
+                    if send_telegram_alert(b, course, course["group_id"], course["tier"], topic_title, topics_map):
+                        seen_batches.add(b["batch_no"])
+                        newly_seen.add(b["batch_no"])
 
             except Exception as e:
                 print(f"Error querying {course['name']} @ {branch_name}: {e}")
 
     if newly_seen:
         save_json(SEEN_DATA_FILE, sorted(list(seen_batches)))
-        print(f"\n[NIRC] Run complete: recorded {len(newly_seen)} new batches.")
+        print(f"\n[NIRC] Run complete: recorded and alerted {len(newly_seen)} new batches.")
     else:
         print("\n[NIRC] Run complete: no new batches detected.")
 
