@@ -25,30 +25,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # - name: Run NIRC Scraper
-      #   env:
-      #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      #   run: python scraper_nirc.py
-
-      # - name: Run WIRC Scraper
-      #   env:
-      #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      #   run: python scraper_wirc.py
-
-      # - name: Run EIRC Scraper
-      #   env:
-      #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      #   run: python scraper_eirc.py
-
-      # - name: Run SIRC Scraper
-      #   env:
-      #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      #   run: python scraper_sirc.py
-
-      - name: Run CIRC Scraper
+      - name: Run All 5 Scrapers in Parallel
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        run: python scraper_circ.py
+        run: |
+          python scraper_nirc.py &
+          PID_NIRC=$!
+
+          python scraper_wirc.py &
+          PID_WIRC=$!
+
+          python scraper_eirc.py &
+          PID_EIRC=$!
+
+          python scraper_sirc.py &
+          PID_SIRC=$!
+
+          python scraper_circ.py &
+          PID_CIRC=$!
+
+          # Wait for all regional scrapers to complete
+          wait $PID_NIRC $PID_WIRC $PID_EIRC $PID_SIRC $PID_CIRC
+          echo "All 5 regional scrapers completed execution."
 
       - name: Commit and push changes
         run: |
@@ -56,9 +54,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --staged --quiet; then
-            echo "No state or topic changes detected."
+            echo "No state or topic changes detected across any region."
           else
-            git commit -m "Auto-update CIRC state & topic maps [skip ci]"
+            git commit -m "Auto-update multi-region state & topic maps [skip ci]"
             git pull --rebase --autostash origin main || git pull --rebase origin main || true
             git push origin main || git push
           fi
