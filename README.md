@@ -36,8 +36,8 @@ I basically vibecoded this whole thing because checking the ICAI portal manually
 
 #### 1. Fork or clone this repo
 ```bash
-git clone [https://github.com/Batatatab/oc-tracker)
-cd YOUR_REPO
+git clone https://github.com/Batatatab/oc-tracker.git
+cd oc-tracker
 ```
 
 #### 2. Install dependencies locally (optional)
