@@ -35,6 +35,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python scraper_wirc.py
 
+      - name: Run EIRC Scraper
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python scraper_eirc.py
+
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
