@@ -65,6 +65,45 @@ pip install -r requirements.txt
 
 ---
 
+## 📲 Telegram Alerts
+
+The scraper can send batch availability alerts directly to Telegram.
+
+There are separate groups for **Intermediate** and **Final**, with forum topics organized by city/branch so you can receive only the alerts relevant to you.
+
+### WIRC — Western India Regional Council
+- **Inter (OC & ITT):** https://t.me/WIRCINTERreminder
+- **Final (Adv. ITT & MCS):** https://t.me/WIRCFINALreminder
+
+### NIRC — Northern India Regional Council
+- **Inter (OC & ITT):** https://t.me/NIRCINTERreminder
+- **Final (Adv. ITT & MCS):** https://t.me/NIRCFINALreminder
+
+### CIRC — Central India Regional Council
+- **Inter (OC & ITT):** https://t.me/CIRCINTERreminder
+- **Final (Adv. ITT & MCS):** https://t.me/CIRCFINALreminder
+
+### SIRC — Southern India Regional Council
+- **Inter (OC & ITT):** https://t.me/SIRCINTERreminder
+- **Final (Adv. ITT & MCS):** https://t.me/SIRCFINALreminder
+
+### EIRC — Eastern India Regional Council
+- **Inter (OC & ITT):** https://t.me/EIRCINTERreminder
+- **Final (Adv. ITT & MCS):** https://t.me/EIRCFINALreminder
+
+### How it works
+
+1. Join the group for your **course and region**.
+2. Open the **Start Here** topic to find your branch/city.
+3. Smaller branches that don't have their own topic are routed to **Other Branches**.
+4. Mute the rest of the group and unmute only your relevant topic if you want to avoid unnecessary notifications.
+
+Each alert contains the **batch number, batch dates, available seats, and a direct registration link**.
+
+No ICAI login or credentials are required. The scraper only reads the publicly available batch schedule and does not access user accounts.
+
+> **Note:** The Telegram alerts are completely free. The project is open source.
+
 ### Disclaimer
 
 This is an unofficial student project made to help track batch openings. It is not affiliated with or endorsed by ICAI. Always check the official ICAI portal directly before booking or making travel arrangements.
