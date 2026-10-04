@@ -121,6 +121,29 @@ No ICAI login or credentials are required. The scraper only reads the publicly a
 
 > **Note:** The Telegram alerts are completely free. The project is open source.
 
+## 📸 Screenshots
+
+### Telegram Alerts
+
+Actual batch alerts with course, centre, batch code, dates, timings, seats and registration link.
+
+<img width="1432" height="665" alt="image" src="https://github.com/user-attachments/assets/4261a7c0-1ffe-4d77-aff8-70112c04a9cc" />
+
+
+### Telegram Topics
+
+Alerts are separated into region, course and branch/city-specific topics.
+
+<img width="1903" height="911" alt="image" src="https://github.com/user-attachments/assets/0eeee498-c477-4e98-b49c-275c71d7c51b" />
+
+
+### Multi-Region Alerts
+
+The bot monitors all five ICAI regions and routes alerts to the appropriate topics.
+
+<img width="1912" height="915" alt="image" src="https://github.com/user-attachments/assets/5dd6016b-0efd-4ebf-89ab-312a455b2128" />
+
+
 ### Disclaimer
 
 This is an unofficial student project made to help track batch openings. It is not affiliated with or endorsed by ICAI. Always check the official ICAI portal directly before booking or making travel arrangements.
